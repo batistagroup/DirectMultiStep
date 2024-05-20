@@ -35,7 +35,7 @@ RDLogger.DisableLog("rdApp.*")
 
 data_path = Path(__file__).resolve().parent / "Data"
 processed_path = data_path / "Processed"
-train_path = data_path / "Training"
+ckpt_path = data_path / "Checkpoints"
 fig_path = data_path / "Figures"
 
 beam_size = 10
@@ -98,10 +98,7 @@ van_dec_conf = VanillaTransformerConfig(
 )
 model = prepare_model(enc_config=van_enc_conf, dec_config=van_dec_conf)
 
-ckpt_lightning = torch.load(train_path / run_name / ckpt_name, map_location=device)
-ckpt_torch = {
-    k.replace("model.", ""): v for k, v in ckpt_lightning["state_dict"].items()
-}
+ckpt_torch = torch.load(ckpt_path / run_name / ckpt_name, map_location=device)
 model.load_state_dict(ckpt_torch)
 model.to(device)
 model.eval()
