@@ -31,6 +31,8 @@ For training see:
 
 Once everything is set up, it's suffice to simply run `python train_wsm.py`.
 
+Run `bash download_ckpts.sh` to download our checkpoints from the file storage.
+
 ## Licenses
 
 All code is licensed under MIT License.
