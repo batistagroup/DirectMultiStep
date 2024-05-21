@@ -33,6 +33,14 @@ Once everything is set up, it's suffice to simply run `python train_wsm.py`.
 
 Run `bash download_ckpts.sh` to download our checkpoints from the file storage.
 
+## Tutorials
+
+To use the tutorials, simply move/copy them to the root directory. This is necessary because the notebooks use relative imports.
+
+- [Tutorials/Basic_Usage.ipynb](/Tutorials/Basic_Usage.ipynb) walks you through how to input your compounds, steps, and starting materials. Visualization of routes in PDF is shown. 
+- [Tutorials/Route_Separation.ipynb](/Tutorials/Route_Separation.ipynb) reproduces the route separation results from the paper.
+- [Tutorials/Pharma_Compounds.ipynb](/Tutorials/Pharma_Compounds.ipynb) reproduces the three FDA-approved drug results from the paper.
+
 ## Licenses
 
 All code is licensed under MIT License.
