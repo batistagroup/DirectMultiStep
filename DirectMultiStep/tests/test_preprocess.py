@@ -22,9 +22,9 @@
 
 import pytest
 from rdkit import Chem
-from Utils.PreProcess import filter_mol_nodes, max_tree_depth, find_leaves, generate_permutations
+from DirectMultiStep.Utils.PreProcess import filter_mol_nodes, max_tree_depth, find_leaves, generate_permutations
 from test_data import *
-from Data.Dataset import tokenize_smile, tokenize_path_string
+from DirectMultiStep.Utils.Dataset import tokenize_smile, tokenize_path_string
 
 test_filtering_and_depth = [
     pytest.param(test1_leaves, 0, id="leaves"),

@@ -21,7 +21,7 @@
 # SOFTWARE.
 
 import pickle
-from Data.Dataset import StepSM_Dataset_v2, RoutesStepsDataset
+from DirectMultiStep.Utils.Dataset import StepSM_Dataset_v2, RoutesStepsDataset
 from typing import Tuple
 from pathlib import Path
 import re

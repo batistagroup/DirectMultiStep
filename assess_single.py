@@ -20,10 +20,10 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
 
-from Models.TensorGen import BeamSearchOptimized as BeamSearch
-from Models.Configure import VanillaTransformerConfig, prepare_model
-from Data.Dataset import RoutesDataset
-from Utils.PostProcess import BeamResultType, find_valid_paths, process_paths
+from DirectMultiStep.Models.TensorGen import BeamSearchOptimized as BeamSearch
+from DirectMultiStep.Models.Configure import VanillaTransformerConfig, prepare_model
+from DirectMultiStep.Utils.Dataset import RoutesDataset
+from DirectMultiStep.Utils.PostProcess import BeamResultType, find_valid_paths, process_paths
 import torch
 import yaml
 from pathlib import Path
@@ -129,7 +129,7 @@ correct_paths_NS2n = process_paths(
         )
 # correct_paths_NS2n = valid_paths_NS2n
 print(f"Length of correct paths: {len(correct_paths_NS2n[0])}")
-from Utils.Visualize import draw_tree_from_path_string
+from DirectMultiStep.Utils.Visualize import draw_tree_from_path_string
 
 for i, beam_result in enumerate(correct_paths_NS2n[0]):
     draw_tree_from_path_string(
