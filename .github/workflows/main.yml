@@ -24,13 +24,9 @@ jobs:
         pip install numpy torch rdkit
         pip install pytest pytest-cov
 
-    - name: Add project root to Python path
-      run: echo "PYTHONPATH=$PYTHONPATH:${{ github.workspace }}" >> $GITHUB_ENV
-
     - name: Run tests and collect coverage
-      run: |
-      cd ${{ github.workspace }}
-      pytest
+      run: pytest
+      
     - name: Upload coverage to Codecov
       uses: codecov/codecov-action@v4-beta
       env:
