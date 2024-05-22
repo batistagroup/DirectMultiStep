@@ -2,3 +2,6 @@
 omit =
     test_*
     setup.py
+
+[pytest]
+testpaths = tests
