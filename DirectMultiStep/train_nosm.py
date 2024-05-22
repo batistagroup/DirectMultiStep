@@ -27,7 +27,7 @@ from Models.Configure import prepare_model, determine_device, VanillaTransformer
 from Models.Training import PLTraining
 from lightning.pytorch.callbacks import ModelCheckpoint
 from lightning.pytorch.callbacks import RichModelSummary
-import helpers
+import DirectMultiStep.helpers as helpers
 
 data_path = Path(__file__).resolve().parent / "Data" / "Processed"
 train_path = Path(__file__).resolve().parent / "Data" / "Training"

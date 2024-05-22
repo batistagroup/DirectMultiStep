@@ -20,8 +20,8 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
 
-from Models.Generation import BeamSearchOutput
-from Utils.PreProcess import (
+from ..Models.Generation import BeamSearchOutput
+from .PreProcess import (
     canonicalize_smiles,
     find_leaves,
     generate_permutations,

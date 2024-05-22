@@ -22,9 +22,9 @@
 
 import pytest
 from rdkit import Chem
-from DirectMultiStep.Utils.PreProcess import filter_mol_nodes, max_tree_depth, find_leaves, generate_permutations
-from test_data import *
-from DirectMultiStep.Utils.Dataset import tokenize_smile, tokenize_path_string
+from ..Utils.PreProcess import filter_mol_nodes, max_tree_depth, find_leaves, generate_permutations
+from .test_data import *
+from ..Utils.Dataset import tokenize_smile, tokenize_path_string
 
 test_filtering_and_depth = [
     pytest.param(test1_leaves, 0, id="leaves"),
@@ -125,3 +125,5 @@ def test_generate_permutations_complex_case():
 def test_generate_permutations_parametrized(data, expected):
     assert generate_permutations(data, child_key="c") == expected
 
+if __name__ == "__main__":
+    pytest.main(["-v", "-s", __file__])
