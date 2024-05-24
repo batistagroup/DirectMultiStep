@@ -19,13 +19,16 @@ TOTAL                   217    122    44%
 
 The preprint for this work is posted on [arXiv](https://arxiv.org/abs/2405.13983).
 
-- [Data/Dataset.py](/DirectMultiStep/Data/Dataset.py) definition of custom torch Datasets used for training and evaluation.
-- [Data/process.py](/DirectMultiStep/Data/process.py) scripts to preprocess PaRoutes dataset and create training and evaluation partitions.
+- [Data/process.py](/Data/process.py) scripts to preprocess PaRoutes dataset and create training and evaluation partitions.
 - [Models/Architecture.py](/DirectMultiStep/Models/Architecture.py) contains definitions of Encoder, Decoder, and combining Seq2Seq module.
 - [Models/Training.py](/DirectMultiStep/Models/Training.py) definition of Lightning Training class
 - [Models/Configure.py](/DirectMultiStep/Models/Configure.py) definiton of model config
 - [Models/Generation.py](/DirectMultiStep/Models/Generation.py) implementation of beam search using python lists
 - [Models/TensorGen.py](/DirectMultiStep/Models/TensorGen.py) implementation of beam search using torch.Tensors to maximize GPU efficiency. Warning: the current algorithm works properly only with batch_size=1 inputs (PRs welcome).
+- [Utils/Dataset.py](/DirectMultiStep/Utils/Dataset.py) definition of custom torch Datasets used for training and evaluation.
+- [Utils/PreProcess.py](/DirectMultiStep/Utils/PreProcess.py) all functions related to preprocessing of the PaRoutes dataset (used by [Data/process.py](/Data/process.py))
+- [Utils/PostProcess.py](/DirectMultiStep/Utils/PostProcess.py) all functions needed to postprocess results of beam search and run evaluations
+- [Utils/Visualize.py](/DirectMultiStep/Utils/Visualize.py) function that draws the synthesis tree as a pdf
 
 For training see:
 
@@ -35,6 +38,8 @@ For training see:
 Once everything is set up, it's suffice to simply run `python train_wsm.py`.
 
 Run `bash download_ckpts.sh` to download our checkpoints from the file storage.
+
+Finally, we provide [assess_single.py](/assess_single.py) which allows to run our model on a single target compound.
 
 ## Tutorials
 
@@ -47,3 +52,8 @@ To use the tutorials, simply move/copy them to the root directory. This is neces
 ## Licenses
 
 All code is licensed under MIT License.
+
+## TODO:
+
+- Bring codecov to 80+. 
+- Revise [Models/TensorGen.py](/DirectMultiStep/Models/TensorGen.py) so that it can work with batch size greater than 1.
