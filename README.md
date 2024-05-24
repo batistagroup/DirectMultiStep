@@ -2,6 +2,7 @@
 
 [![Checked with mypy](https://www.mypy-lang.org/static/mypy_badge.svg)](https://mypy-lang.org/)
 [![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
+[![codecov](https://codecov.io/gh/batistagroup/DirectMultiStep/graph/badge.svg?token=2G1x86tsjc)](https://codecov.io/gh/batistagroup/DirectMultiStep)
 
 Code coverage with tests:
 
@@ -15,6 +16,8 @@ TOTAL                   217    122    44%
 ```
 
 ## Overview
+
+The preprint for this work is posted on [arXiv](https://arxiv.org/abs/2405.13983).
 
 - [Data/Dataset.py](/Data/Dataset.py) definition of custom torch Datasets used for training and evaluation.
 - [Data/process.py](/Data/process.py) scripts to preprocess PaRoutes dataset and create training and evaluation partitions.
