@@ -23,50 +23,41 @@
 import torch
 import lightning as L
 from pathlib import Path
-from Models.Configure import prepare_model, determine_device, VanillaTransformerConfig
-from Models.Training import PLTraining
+from DirectMultiStep.Models.Configure import prepare_model, determine_device, VanillaTransformerConfig
+from DirectMultiStep.Models.Training import PLTraining
 from lightning.pytorch.callbacks import ModelCheckpoint
 from lightning.pytorch.callbacks import RichModelSummary
 import DirectMultiStep.helpers as helpers
 
 data_path = Path(__file__).resolve().parent / "Data" / "Processed"
 train_path = Path(__file__).resolve().parent / "Data" / "Training"
-run_name = "van_6x3_6x3_020"
+run_name = "nosm_run_name"
 batch_size = 32
 lr = 3e-4
 steps_per_epoch = 30299
 max_epochs = 4
 L.seed_everything(42)
-n_devices = 1
+n_devices = 4
 torch.set_float32_matmul_precision("high")
 dl_kwargs = dict(num_workers=0, pin_memory=True)
 
-van_enc_conf = VanillaTransformerConfig(
+model_10m = dict(n_layers=6, ff_mult=3, hid_dim=256)
+model_60m = dict(n_layers=8, ff_mult=4, hid_dim=512)
+
+model_config = VanillaTransformerConfig(
     input_dim=53,
     output_dim=53,
     input_max_length=145,
-    output_max_length=1074 + 1,  # 1074 is max length
+    output_max_length=1074 + 1,
     pad_index=52,
-    n_layers=12,
-    ff_mult=4,
     attn_bias=False,
     ff_activation="gelu",
-    hid_dim=512,
-)
-van_dec_conf = VanillaTransformerConfig(
-    input_dim=53,
-    output_dim=53,
-    input_max_length=145,
-    output_max_length=1074 + 1,  # 1074 is max length
-    pad_index=52,
-    n_layers=12,
-    ff_mult=4,
-    attn_bias=False,
-    ff_activation="gelu",
-    hid_dim=512,
+    **model_10m,
+    # **model_60m,
 )
 
-model = prepare_model(enc_config=van_enc_conf, dec_config=van_dec_conf)
+# enc and dec configs may be different
+model = prepare_model(enc_config=model_config, dec_config=model_config)
 if __name__ == "__main__":
     # Training hyperparameters
     mask_idx, pad_idx = 51, 52

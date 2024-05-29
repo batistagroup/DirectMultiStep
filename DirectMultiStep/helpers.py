@@ -105,6 +105,8 @@ def find_checkpoint(train_path: str, run_name: str) -> Path:
     checkpoints.sort(key=lambda ckpt: parse_epoch_step(ckpt.name), reverse=True)
     return checkpoints[0] if checkpoints else None
 
+
+
 if __name__ == "__main__":
     train_path = Path(__file__).resolve().parent / "Data" / "Training"
     run_name = "moe_3x2_3x3_002_local"

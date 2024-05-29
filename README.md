@@ -4,17 +4,6 @@
 [![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
 [![codecov](https://codecov.io/gh/batistagroup/DirectMultiStep/graph/badge.svg?token=2G1x86tsjc)](https://codecov.io/gh/batistagroup/DirectMultiStep)
 
-Code coverage with tests:
-
-```bash
-Name                  Stmts   Miss  Cover
------------------------------------------
-Data/Dataset.py         157    114    27%
-Utils/PreProcess.py      60      8    87%
------------------------------------------
-TOTAL                   217    122    44%
-```
-
 ## Overview
 
 The preprint for this work is posted on [arXiv](https://arxiv.org/abs/2405.13983).
@@ -45,15 +34,15 @@ Finally, we provide [assess_single.py](/assess_single.py) which allows to run ou
 
 To use the tutorials, simply move/copy them to the root directory. This is necessary because the notebooks use relative imports.
 
-- [Tutorials/Basic_Usage.ipynb](/Tutorials/Basic_Usage.ipynb) walks you through how to input your compounds, steps, and starting materials. Visualization of routes in PDF is shown. 
+- [Tutorials/Basic_Usage.ipynb](/Tutorials/Basic_Usage.ipynb) walks you through how to input your compounds, steps, and starting materials. Visualization of routes in PDF is shown.
 - [Tutorials/Route_Separation.ipynb](/Tutorials/Route_Separation.ipynb) reproduces the route separation results from the paper.
 - [Tutorials/Pharma_Compounds.ipynb](/Tutorials/Pharma_Compounds.ipynb) reproduces the three FDA-approved drug results from the paper.
 
 ## Licenses
 
-All code is licensed under MIT License.
+All code is licensed under MIT License. The content of the [pre-print on arXiv](https://arxiv.org/abs/2405.13983) is licensed under CC-BY 4.0.
 
-## TODO:
+## TODO
 
-- Bring codecov to 80+. 
+- Bring codecov to 80+.
 - Revise [Models/TensorGen.py](/DirectMultiStep/Models/TensorGen.py) so that it can work with batch size greater than 1.
