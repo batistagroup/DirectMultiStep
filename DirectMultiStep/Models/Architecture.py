@@ -21,19 +21,19 @@
 # SOFTWARE.
 
 """
-    Shape suffixes convention inspired by
-    https://medium.com/@NoamShazeer/shape-suffixes-good-coding-style-f836e72e24fd
+Shape suffixes convention inspired by
+https://medium.com/@NoamShazeer/shape-suffixes-good-coding-style-f836e72e24fd
 
-    B: batch size
-    C: the length of the input on which conditioning is done
-       in our case input_max_length
-    L: sequence length for decoder, in our case output_max_length
-    M: memory length (length of sequence being attended to)
-    D: model dimension (sometimes called d_model or embedding_dim)
-    V: vocabulary size
-    F: feed-forward subnetwork hidden size
-    H: number of attention heads in a layer
-    K: size of each attention key or value (sometimes called d_kv)
+B: batch size
+C: the length of the input on which conditioning is done
+   in our case input_max_length
+L: sequence length for decoder, in our case output_max_length
+M: memory length (length of sequence being attended to)
+D: model dimension (sometimes called d_model or embedding_dim)
+V: vocabulary size
+F: feed-forward subnetwork hidden size
+H: number of attention heads in a layer
+K: size of each attention key or value (sometimes called d_kv)
 """
 
 import torch
@@ -202,13 +202,13 @@ class EncoderLayer(nn.Module):
         self.attn_ln = nn.LayerNorm(config.hid_dim)
         self.ff_ln = nn.LayerNorm(config.hid_dim)
         self.attention = MultiHeadAttentionLayer(config, device)
-        match config.ff_type:
-            case "moe":
-                self.mlp = SparseMoE(config)
-            case "vanilla":
-                self.mlp = PositionwiseFeedforwardLayer(config)
-            case _:
-                raise ValueError(f"Unknown feedforward type: {config.ff_type}")
+        self.mlp: nn.Module
+        if config.ff_type == "moe":
+            self.mlp = SparseMoE(config)
+        elif config.ff_type == "vanilla":
+            self.mlp = PositionwiseFeedforwardLayer(config)
+        else:
+            raise ValueError(f"Unknown feedforward type: {config.ff_type}")
         self.dropout = nn.Dropout(config.dropout)
 
     def forward(self, input_BCD: Tensor, src_mask_B11C: Tensor) -> Tensor:
@@ -264,13 +264,13 @@ class DecoderLayer(nn.Module):
         self.ff_ln = nn.LayerNorm(config.hid_dim)
         self.self_attn = MultiHeadAttentionLayer(config, device)
         self.encoder_attn = MultiHeadAttentionLayer(config, device)
-        match config.ff_type:
-            case "moe":
-                self.mlp = SparseMoE(config)
-            case "vanilla":
-                self.mlp = PositionwiseFeedforwardLayer(config)
-            case _:
-                raise ValueError(f"Unknown feedforward type: {config.ff_type}")
+        self.mlp: nn.Module
+        if config.ff_type == "moe":
+            self.mlp = SparseMoE(config)
+        elif config.ff_type == "vanilla":
+            self.mlp = PositionwiseFeedforwardLayer(config)
+        else:
+            raise ValueError(f"Unknown feedforward type: {config.ff_type}")
         self.dropout = nn.Dropout(config.dropout)
 
     def forward(

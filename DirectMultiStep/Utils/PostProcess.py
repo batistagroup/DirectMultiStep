@@ -29,7 +29,7 @@ from .PreProcess import (
     stringify_dict,
     max_tree_depth,
 )
-from typing import List, Tuple, Dict, Set, Optional
+from typing import List, Tuple, Dict, Set, Optional, Iterator, cast
 import json
 from tqdm import tqdm
 
@@ -47,9 +47,9 @@ def find_valid_paths(
         print("Starting to find valid paths:")
     valid_pathreac_NS2n = []
     iterator = tqdm(beam_results_NS2) if verbose else beam_results_NS2
-    for beam_result_S2 in iterator:
+    for beam_result_S2 in iterator:  # type: ignore
         valid_pathreac_S2n = []
-        for path_string, score in beam_result_S2:
+        for path_string, _ in beam_result_S2:
             try:
                 node = eval(path_string)
                 reactants = find_leaves(node)
@@ -57,7 +57,7 @@ def find_valid_paths(
                     canonicalize_smiles(reactant) for reactant in reactants
                 ]
                 canon_path = canonicalize_path_string(path_string)
-            except:
+            except:  # noqa: E722
                 continue
             valid_pathreac_S2n.append((canon_path, canon_reactants))
         valid_pathreac_NS2n.append(valid_pathreac_S2n)
@@ -68,7 +68,7 @@ def find_valid_paths(
 
 def find_matching_paths(
     paths_NS2n: PathsProcessedType, correct_paths: List[str], verbose: bool = False
-) -> Tuple[MatchList]:
+) -> Tuple[MatchList, MatchList]:
     if verbose:
         print("Starting to find matching paths:")
     match_accuracy_N: MatchList = []
@@ -78,7 +78,7 @@ def find_matching_paths(
         if verbose
         else zip(paths_NS2n, correct_paths)
     )
-    for pathreac_S2n, correct_path in iterator:
+    for pathreac_S2n, correct_path in iterator:  # type: ignore
         path_match = None
         path_match_perm = None
         for rank, (path, _) in enumerate(pathreac_S2n):
@@ -97,7 +97,7 @@ def find_matching_paths(
 
 def find_top_n_accuracy(
     match_accuracy: List[int], n_vals: List[int], dec_digs: int = 1
-) -> Dict[str, float]:
+) -> Dict[str, str]:
     n_vals = sorted(n_vals)
     top_counts = {f"Top {n}": 0 for n in n_vals}
     for rank in match_accuracy:
@@ -120,7 +120,7 @@ def remove_repetitions_within_beam_result(
         print("Starting to remove repetitions within beam results:")
     unique_paths_NS2n = []
     iterator = tqdm(paths_NS2n) if verbose else paths_NS2n
-    for path_reac_S2 in iterator:
+    for path_reac_S2 in cast(Iterator, iterator):
         unique_paths_S2n = []
         seen = set()
         for path, reacs_n in path_reac_S2:
@@ -143,7 +143,7 @@ def find_paths_with_commercial_sm(
         print("Starting to find paths with commercial reactants:")
     available_paths_NS2n = []
     iterator = tqdm(paths_NS2n) if verbose else paths_NS2n
-    for path_reac_S2 in iterator:
+    for path_reac_S2 in cast(Iterator, iterator):
         available_paths_S2n = []
         for path, reacs_n in path_reac_S2:
             if all(reactant in commercial_stock for reactant in reacs_n):
@@ -155,7 +155,7 @@ def find_paths_with_commercial_sm(
 def find_paths_with_correct_product_and_reactants(
     paths_NS2n: PathsProcessedType,
     true_products: List[str],
-    true_reacs: Optional[List[str]]=None,
+    true_reacs: Optional[List[str]] = None,
     verbose: bool = False,
 ) -> PathsProcessedType:
     if verbose:
@@ -163,13 +163,12 @@ def find_paths_with_correct_product_and_reactants(
     f = canonicalize_smiles
     correct_paths_NS2n = []
     iterator = tqdm(enumerate(paths_NS2n)) if verbose else enumerate(paths_NS2n)
-    for idx, path_reac_S2 in iterator:
+    for idx, path_reac_S2 in cast(Iterator, iterator):
         correct_paths_S2n = []
         for path, reacs_n in path_reac_S2:
             path_tree = eval(path)
-            if (
-                f(path_tree["smiles"]) == f(true_products[idx])
-                and (true_reacs is None or f(true_reacs[idx]) in reacs_n)
+            if f(path_tree["smiles"]) == f(true_products[idx]) and (
+                true_reacs is None or f(true_reacs[idx]) in reacs_n
             ):
                 correct_paths_S2n.append((path, reacs_n))
         correct_paths_NS2n.append(correct_paths_S2n)
@@ -178,11 +177,13 @@ def find_paths_with_correct_product_and_reactants(
 
 def canonicalize_path_dict(path_dict: FilteredDict) -> FilteredDict:
     canon_dict: FilteredDict = {}
-    canon_dict["smiles"] = canonicalize_smiles(path_dict["smiles"])
+    canon_dict["smiles"] = canonicalize_smiles(cast(str, path_dict["smiles"]))
     if "children" in path_dict:
         canon_dict["children"] = []
         for child in path_dict["children"]:
-            canon_dict["children"].append(canonicalize_path_dict(child))
+            cast(list, canon_dict["children"]).append(
+                canonicalize_path_dict(cast(FilteredDict, child))
+            )
     return canon_dict
 
 
@@ -191,19 +192,21 @@ def canonicalize_path_string(path_string: str) -> str:
     return stringify_dict(canon_dict)
 
 
-def canonicalize_paths(paths_NS2n: PathsProcessedType, verbose:bool=False) -> PathsProcessedType:
+def canonicalize_paths(
+    paths_NS2n: PathsProcessedType, verbose: bool = False
+) -> PathsProcessedType:
     if verbose:
         print("Starting to canonicalize paths:")
     canon_paths_NS2n = []
     counter = 0
     iterator = tqdm(paths_NS2n) if verbose else paths_NS2n
-    for path_reac_S2 in iterator:
+    for path_reac_S2 in cast(Iterator, iterator):
         canon_paths_S2n = []
         for path, reacs_n in path_reac_S2:
             try:
                 canon_path = canonicalize_path_string(path)
                 canon_paths_S2n.append((canon_path, reacs_n))
-            except Exception as e:
+            except Exception:
                 # print(f"Raised {e=}")
                 counter += 1
         canon_paths_NS2n.append(canon_paths_S2n)
@@ -214,7 +217,7 @@ def canonicalize_paths(paths_NS2n: PathsProcessedType, verbose:bool=False) -> Pa
 def process_paths(
     paths_NS2n: PathsProcessedType,
     true_products: List[str],
-    true_reacs: Optional[List[str]]=None,
+    true_reacs: Optional[List[str]] = None,
     commercial_stock: Optional[Set[str]] = None,
     verbose: bool = False,
 ) -> PathsProcessedType:

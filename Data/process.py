@@ -23,7 +23,7 @@
 import json
 import pickle
 from tqdm import tqdm
-from Utils.PreProcess import (
+from DirectMultiStep.Utils.PreProcess import (
     filter_mol_nodes,
     max_tree_depth,
     find_leaves,
@@ -31,7 +31,7 @@ from Utils.PreProcess import (
     generate_permutations,
 )
 from pathlib import Path
-from typing import List, Tuple, Dict, Union, Set, Optional
+from typing import List, Tuple, Dict, Union, Set, Optional, cast
 
 data_path = Path(__file__).parent / "PaRoutes"
 save_path = Path(__file__).parent / "Processed"
@@ -43,7 +43,6 @@ Dataset = List[DatasetEntry]
 
 
 class PaRoutesDataset:
-
     def __init__(self, data_path: Path, filename: str, verbose: bool = True):
         self.data_path = data_path
         self.filename = filename
@@ -102,12 +101,12 @@ class PaRoutesDataset:
     ) -> Tuple[Dataset, Dataset]:
         if exclude is None:
             exclude = set()
-        dataset:Dataset = []
-        dataset_each_sm:Dataset = []
+        dataset: Dataset = []
+        dataset_each_sm: Dataset = []
         for i in tqdm(range(len(self.products))):
             if i in exclude:
                 continue
-            entry:DatasetEntry = {
+            entry: DatasetEntry = {
                 "train_ID": i,
                 "product": self.products[i],
                 "path_strings": self.path_strings[i],
@@ -138,9 +137,7 @@ class PaRoutesDataset:
         for filtered_route in tqdm(self.filtered_data):
             non_permuted_string = str(filtered_route).replace(" ", "")
             non_permuted_paths.add(non_permuted_string)
-            permuted_path_strings = generate_permutations(
-                filtered_route, max_perm=None
-            )
+            permuted_path_strings = generate_permutations(filtered_route, max_perm=None)
             for permuted_path_string in permuted_path_strings:
                 if permuted_path_string in exclude_path_strings:
                     break
@@ -156,11 +153,11 @@ class PaRoutesDataset:
 
                 for path_string in permuted_path_strings:
                     for sm_count, starting_material in enumerate(all_SMs):
-                        products.append(filtered_route["smiles"])
+                        products.append(cast(str, filtered_route["smiles"]))
                         starting_materials.append(starting_material)
                         path_strings.append(path_string)
                         n_steps_list.append(n_steps)
-                        if n_sms is not None and sm_count+1 >= n_sms:
+                        if n_sms is not None and sm_count + 1 >= n_sms:
                             break
         print(f"Created dataset with {len(products)} entries")
         pickle.dump(
@@ -168,6 +165,7 @@ class PaRoutesDataset:
             open(save_path, "wb"),
         )
         return non_permuted_paths
+
 
 # ------- Dataset Processing -------
 # print("--- Processing of the PaRoutes dataset begins!")
@@ -238,10 +236,10 @@ class PaRoutesDataset:
 
 # ------- Remove SM info from datasets -------
 
-def remove_sm_from_ds(load_path:Path, save_path:Path):
+
+def remove_sm_from_ds(load_path: Path, save_path: Path):
     products, _, path_strings, n_steps_lists = pickle.load(open(load_path, "rb"))
     pickle.dump((products, path_strings, n_steps_lists), open(save_path, "wb"))
-
 
 
 # remove_sm_from_ds(load_path=save_path / "all_dataset_nperms=1_nsms=1.pkl", save_path=save_path / "all_dataset_nperms=1_nosm.pkl")

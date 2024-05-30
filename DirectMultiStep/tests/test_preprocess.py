@@ -21,9 +21,24 @@
 # SOFTWARE.
 
 import pytest
-from rdkit import Chem
-from ..Utils.PreProcess import filter_mol_nodes, max_tree_depth, find_leaves, generate_permutations
-from .test_data import *
+from ..Utils.PreProcess import (
+    filter_mol_nodes,
+    max_tree_depth,
+    find_leaves,
+    generate_permutations,
+)
+from .test_data import (
+    test1_leaves,
+    test2_depth1,
+    test3_depth2,
+    test4_n1route0,
+    test5_depth0_leaves,
+    test6_depth1_leaves,
+    test7_depth2_leaves,
+    test8_n1route_leaves,
+    test9_tknz_smiles,
+    test10_tknz_path,
+)
 from ..Utils.Dataset import tokenize_smile, tokenize_path_string
 
 test_filtering_and_depth = [
@@ -63,67 +78,87 @@ test_leaves = [
     pytest.param(test7_depth2_leaves, id="depth2"),
     pytest.param(test8_n1route_leaves, id="n1route_idx0"),
 ]
+
+
 @pytest.mark.parametrize("data", test_leaves)
 def test_find_leaves(data):
     for item in data:
         assert find_leaves(item["filtered"]) == item["leaves"]
 
+
 @pytest.mark.parametrize("data", test9_tknz_smiles)
 def test_tokenize_smile(data):
     assert tokenize_smile(data[0]) == data[1]
+
 
 @pytest.mark.parametrize("data", test10_tknz_path)
 def test_tokenize_path(data):
     assert tokenize_path_string(data[0]) == data[1]
 
+
 def test_generate_permutations_no_children():
     # Test data with no children
-    data = {'s': 'A'}
+    data = {"s": "A"}
     assert generate_permutations(data, child_key="c") == [str(data).replace(" ", "")]
+
 
 def test_generate_permutations_single_child():
     # Test data with one child
-    data = {'s': 'A', 'c': [{'s': 'B'}]}
+    data = {"s": "A", "c": [{"s": "B"}]}
     expected_output = [str(data).replace(" ", "")]
     assert generate_permutations(data, child_key="c") == expected_output
 
+
 def test_generate_permutations_multiple_children():
     # Test data with multiple children
-    data = {'s': 'A', 'c': [{'s': 'B'}, {'s': 'C'}]}
+    data = {"s": "A", "c": [{"s": "B"}, {"s": "C"}]}
     expected_output = [
-        str({'s': 'A', 'c': [{'s': 'B'}, {'s': 'C'}]}).replace(" ", ""),
-        str({'s': 'A', 'c': [{'s': 'C'}, {'s': 'B'}]}).replace(" ", "")
+        str({"s": "A", "c": [{"s": "B"}, {"s": "C"}]}).replace(" ", ""),
+        str({"s": "A", "c": [{"s": "C"}, {"s": "B"}]}).replace(" ", ""),
     ]
     assert sorted(generate_permutations(data, child_key="c")) == sorted(expected_output)
 
+
 def test_generate_permutations_nested_children():
     # Test data with nested children
-    data = {'s': 'A', 'c': [{'s': 'B', 'c': [{'s': 'C'}]}]}
+    data = {"s": "A", "c": [{"s": "B", "c": [{"s": "C"}]}]}
     expected_output = [
-        str({'s': 'A', 'c': [{'s': 'B', 'c': [{'s': 'C'}]}]}).replace(" ", "")
+        str({"s": "A", "c": [{"s": "B", "c": [{"s": "C"}]}]}).replace(" ", "")
     ]
     assert generate_permutations(data, child_key="c") == expected_output
 
+
 def test_generate_permutations_with_limit():
     # Test data with a permutation limit
-    data = {'s': 'A', 'c': [{'s': 'B'}, {'s': 'C'}, {'s': 'D'}]}
+    data = {"s": "A", "c": [{"s": "B"}, {"s": "C"}, {"s": "D"}]}
     # Limit to 2 permutations
     results = generate_permutations(data, max_perm=2, child_key="c")
     assert len(results) == 2
 
+
 def test_generate_permutations_complex_case():
     # More complex structure with depth and multiple children at different levels
-    data = {'s': 'A', 'c': [{'s': 'B', 'c': [{'s': 'C'}, {'s': 'D'}]}, {'s': 'E'}]}
+    data = {"s": "A", "c": [{"s": "B", "c": [{"s": "C"}, {"s": "D"}]}, {"s": "E"}]}
     results = generate_permutations(data, child_key="c")
     # Test that the correct number of permutations is generated (factorial of children count at each level)
-    assert len(results) == 4  # Since there are 2 at top level (B with its children, and E)
+    assert (
+        len(results) == 4
+    )  # Since there are 2 at top level (B with its children, and E)
 
-@pytest.mark.parametrize("data, expected", [
-    ({'s': 'X'}, [str({'s': 'X'}).replace(" ", "")]),
-    ({'s': 'Y', 'c': [{'s': 'Z'}]}, [str({'s': 'Y', 'c': [{'s': 'Z'}]}).replace(" ", "")])
-])
+
+@pytest.mark.parametrize(
+    "data, expected",
+    [
+        ({"s": "X"}, [str({"s": "X"}).replace(" ", "")]),
+        (
+            {"s": "Y", "c": [{"s": "Z"}]},
+            [str({"s": "Y", "c": [{"s": "Z"}]}).replace(" ", "")],
+        ),
+    ],
+)
 def test_generate_permutations_parametrized(data, expected):
     assert generate_permutations(data, child_key="c") == expected
+
 
 if __name__ == "__main__":
     pytest.main(["-v", "-s", __file__])

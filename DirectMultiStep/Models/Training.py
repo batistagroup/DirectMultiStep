@@ -70,6 +70,7 @@ class PLTraining(pl.LightningModule):
         self.warmup_steps = warmup_steps
         self.decay_steps = decay_steps
         self.decay_factor = decay_factor
+        self.processed_tokens = 0
         self.save_hyperparameters(ignore=["criterion", "model"])
 
     def mask_src(self, src_BC: Tensor, masking_prob: float) -> Tensor:
@@ -95,6 +96,7 @@ class PLTraining(pl.LightningModule):
         output_blV = output_BLV.view(-1, output_BLV.shape[-1])  # [B*(L-1), V]
         tgt_bl = tgt_item_BL[:, 1:].reshape(-1)  # [B*(L-1)]
         loss = self.criterion(output_blV, tgt_bl)
+        self.processed_tokens += tgt_item_BL.shape[0] * tgt_item_BL.shape[1]
         return loss
 
     def log_step_info(self, loss, mode: str, prog_bar: bool):
@@ -105,6 +107,7 @@ class PLTraining(pl.LightningModule):
             prog_bar=prog_bar,
             sync_dist=True,
         )
+        self.log("processed_tokens", self.processed_tokens, sync_dist=True)
         if mode == "train":
             current_lr = self.trainer.optimizers[0].param_groups[0]["lr"]
             self.log(
@@ -122,7 +125,7 @@ class PLTraining(pl.LightningModule):
         return loss
 
     def configure_optimizers(self):
-        optimizer = torch.optim.Adam(self.parameters(), lr=self.learning_rate)
+        optimizer = torch.optim.AdamW(self.parameters(), lr=self.learning_rate)
         # return optimizer
         scheduler = torch.optim.lr_scheduler.LambdaLR(
             optimizer,

@@ -22,8 +22,10 @@
 
 import os
 import cairo
-from rdkit import Chem
-from rdkit.Chem import Draw
+from rdkit import Chem  # type:ignore
+from rdkit.Chem import Draw  # type:ignore
+import cairosvg  # type:ignore
+from pathlib import Path
 
 
 class MoleculeNode:
@@ -340,14 +342,24 @@ def draw_molecule_tree(
             if use_rank:
                 # count the rank of the template from their parent
                 top = node.parent.children.index(node) + 1
-                (x_bearing, y_bearing, width, height, x_advance, y_advance) = (
-                    ctx.text_extents(str(top))
-                )
+                (
+                    x_bearing,
+                    y_bearing,
+                    width,
+                    height,
+                    x_advance,
+                    y_advance,
+                ) = ctx.text_extents(str(top))
             else:
                 # template identity/index
-                (x_bearing, y_bearing, width, height, x_advance, y_advance) = (
-                    ctx.text_extents(str(node.identity))
-                )
+                (
+                    x_bearing,
+                    y_bearing,
+                    width,
+                    height,
+                    x_advance,
+                    y_advance,
+                ) = ctx.text_extents(str(node.identity))
             ctx.move_to(
                 x + img_width / 2 - width / 2 - x_bearing,
                 y + img_height / 2 - height / 2 - y_bearing,
@@ -401,12 +413,19 @@ def draw_molecule_tree(
     surface.finish()
     os.remove("temp.png")
 
-import cairosvg
-from pathlib import Path
+
 def draw_tree_from_path_string(path_string: str, save_path: Path):
-    assert save_path.suffix == '', "Please provide a path without extension"
+    assert save_path.suffix == "", "Please provide a path without extension"
     retro_tree = RetrosynthesisTree(root_smiles=eval(path_string)["smiles"])
     store_in_node(retro_tree, parent_identity=0, path_dict=eval(path_string))
-    draw_molecule_tree(retro_tree.root, filename=str(save_path.with_suffix('.svg')), x_offset=50, y_offset=10)
-    cairosvg.svg2pdf(url=str(save_path.with_suffix('.svg')), write_to=str(save_path.with_suffix('.pdf')))
-    os.remove(save_path.with_suffix('.svg'))
+    draw_molecule_tree(
+        retro_tree.root,
+        filename=str(save_path.with_suffix(".svg")),
+        x_offset=50,
+        y_offset=10,
+    )
+    cairosvg.svg2pdf(
+        url=str(save_path.with_suffix(".svg")),
+        write_to=str(save_path.with_suffix(".pdf")),
+    )
+    os.remove(save_path.with_suffix(".svg"))

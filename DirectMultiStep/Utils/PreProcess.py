@@ -20,7 +20,7 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
 
-from rdkit import Chem
+from rdkit import Chem  # type: ignore
 from typing import Dict, List, Set, Union, cast, Optional
 import itertools
 from itertools import permutations, islice
@@ -48,7 +48,7 @@ def filter_mol_nodes(node: PaRoutesDict) -> FilteredDict:
     ), f"Expected 'type' to be 'mol', got {node.get('type')}"
     filtered_node = {"smiles": canonical_smiles, "children": []}
     # we skip one level of the PaRoutes dictionary as it contains the reaction meta data
-    assert isinstance(node["children"], list), f"Expected 'children' to be a list"
+    assert isinstance(node["children"], list), "Expected 'children' to be a list"
     reaction_meta: List[PaRoutesDict] = node["children"]
     first_child = reaction_meta[0]
     for child in cast(List[PaRoutesDict], first_child["children"]):
@@ -111,7 +111,7 @@ def generate_permutations(
     # Conditionally apply permutation limit
     permutation_generator = permutations(range(len(child_permutations)))
     if max_perm is not None:
-        permutation_generator = islice(permutation_generator, max_perm) # type:ignore
+        permutation_generator = islice(permutation_generator, max_perm)  # type:ignore
 
     for combo in permutation_generator:
         for product in itertools.product(*(child_permutations[i] for i in combo)):

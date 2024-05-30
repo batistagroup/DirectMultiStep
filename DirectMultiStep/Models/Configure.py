@@ -33,7 +33,9 @@ def determine_device(allow_mps: bool = False) -> str:
     device = (
         "cuda"
         if torch.cuda.is_available()
-        else "mps" if allow_mps and torch.backends.mps.is_available() else "cpu"
+        else "mps"
+        if allow_mps and torch.backends.mps.is_available()
+        else "cpu"
     )
     return device
 
@@ -70,13 +72,13 @@ class VanillaTransformerConfig:
         self.ff_mult = ff_mult  # multiplier for feedforward layer
         self.dropout = dropout
         self.attn_bias = attn_bias
+        self.ff_activation: nn.Module
         if ff_activation == "gelu":
             self.ff_activation = nn.GELU()
         elif ff_activation == "relu":
             self.ff_activation = nn.ReLU()
         else:
             raise ValueError("attn_activation must be 'gelu' or 'relu'")
-
 
 
 def prepare_model(enc_config, dec_config):
