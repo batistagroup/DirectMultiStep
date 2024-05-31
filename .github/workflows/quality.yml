@@ -20,7 +20,7 @@ jobs:
         python -m pip install --upgrade pip
         pip install numpy torch rdkit pyyaml
         pip install pytest pytest-cov
-        pip install mypy black isort ruff
+        pip install mypy black isort ruff types-requests types-tqdm types-PyYAML
 
     - name : Run ruff
       run: ruff check
@@ -31,5 +31,5 @@ jobs:
     - name: Run mypy
       run: mypy --strict . --exclude=tests
 
-    - name: Run tests and collect coverage
+    - name: Run tests
       run: pytest -v
