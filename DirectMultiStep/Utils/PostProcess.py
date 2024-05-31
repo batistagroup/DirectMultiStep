@@ -77,7 +77,9 @@ def find_matching_paths(
         if verbose
         else zip(paths_NS2n, correct_paths)
     )
-    for pathreac_S2n, correct_path in cast(Iterator[Tuple[BeamProcessedType, str]], iterator): 
+    for pathreac_S2n, correct_path in cast(
+        Iterator[Tuple[BeamProcessedType, str]], iterator
+    ):
         path_match = None
         path_match_perm = None
         for rank, (path, _) in enumerate(pathreac_S2n):

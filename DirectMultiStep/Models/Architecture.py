@@ -45,7 +45,6 @@ Tensor = torch.Tensor
 
 
 class ModelConfig:
-
     def __init__(
         self,
         input_dim: int,
@@ -150,7 +149,7 @@ class MultiHeadAttentionLayer(nn.Module):
             attn_output_BHLD.permute(0, 2, 1, 3).contiguous().view(B, L, self.hid_dim)
         )
         output_BLD = cast(Tensor, self.projection(attn_output_BLD))
-        return output_BLD 
+        return output_BLD
 
 
 class PositionwiseFeedforwardLayer(nn.Module):

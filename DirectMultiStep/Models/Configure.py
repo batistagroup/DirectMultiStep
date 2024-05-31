@@ -22,10 +22,10 @@
 
 import torch
 import torch.nn as nn
-from .Architecture import Encoder, Decoder, Seq2Seq, ModelConfig
+from DirectMultiStep.Models.Architecture import Encoder, Decoder, Seq2Seq, ModelConfig
 
 
-def count_parameters(model:nn.Module)->int:
+def count_parameters(model: nn.Module) -> int:
     return sum(p.numel() for p in model.parameters() if p.requires_grad)
 
 
@@ -40,7 +40,7 @@ def determine_device(allow_mps: bool = False) -> str:
     return device
 
 
-def prepare_model(enc_config:ModelConfig, dec_config:ModelConfig)->nn.Module:
+def prepare_model(enc_config: ModelConfig, dec_config: ModelConfig) -> nn.Module:
     device = torch.device(determine_device())
     encoder = Encoder(config=enc_config, device=device)
     decoder = Decoder(config=dec_config, device=device)

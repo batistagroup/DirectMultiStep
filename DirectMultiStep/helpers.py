@@ -93,7 +93,7 @@ def find_checkpoint(train_path: str | Path, run_name: str) -> Optional[Path]:
         return sorted(last_checkpoints, key=parse_version, reverse=True)[0]
 
     # If no "last" file, find the checkpoint with the largest epoch and step
-    def parse_epoch_step(filename: str):
+    def parse_epoch_step(filename: str) -> Tuple[int, int]:
         # This pattern will match 'epoch=X-step=Y.ckpt' and extract X and Y
         match = re.search(r"epoch=(\d+)-step=(\d+)\.ckpt", filename)
         if match:

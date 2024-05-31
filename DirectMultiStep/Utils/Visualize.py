@@ -22,9 +22,9 @@
 
 import os
 import cairo
-from rdkit import Chem # type: ignore
-from rdkit.Chem import Draw # type: ignore
-import cairosvg # type: ignore
+from rdkit import Chem  # type: ignore
+from rdkit.Chem import Draw  # type: ignore
+import cairosvg  # type: ignore
 from pathlib import Path
 from typing import Dict, List, Tuple, Union, cast
 
@@ -120,7 +120,12 @@ def check_overlap(
 
 
 def draw_rounded_rectangle(
-    ctx: cairo.Context, x: int, y: int, width: int, height: int, corner_radius: int # type: ignore
+    ctx: cairo.Context,
+    x: int,
+    y: int,
+    width: int,
+    height: int,
+    corner_radius: int,  # type: ignore
 ) -> None:
     """Draws a rounded rectangle."""
     ctx.new_sub_path()
@@ -152,7 +157,7 @@ def draw_molecule_tree(
     height: int = 400,
     x_margin: int = 50,
     y_margin: int = 50,
-)->None:
+) -> None:
     canvas_width, canvas_height = compute_canvas_dimensions(
         tree, width, height, y_margin
     )
@@ -161,7 +166,7 @@ def draw_molecule_tree(
 
     existing_boxes: List[Tuple[int, int]] = []
 
-    def draw_node(node:'RetroSynthesisTree', x:int, y:int)->None:
+    def draw_node(node: "RetroSynthesisTree", x: int, y: int) -> None:
         # Check for overlap and adjust position
         while check_overlap(x, y, existing_boxes, width, height) or check_overlap(
             x, y - y_margin, existing_boxes, width, height
@@ -241,7 +246,14 @@ def draw_molecule_tree(
     os.remove("temp.png")
 
 
-def draw_tree_from_path_string(path_string: str, save_path: Path, width: int = 400, height: int = 400, x_margin: int = 50, y_margin: int = 100)->None:
+def draw_tree_from_path_string(
+    path_string: str,
+    save_path: Path,
+    width: int = 400,
+    height: int = 400,
+    x_margin: int = 50,
+    y_margin: int = 100,
+) -> None:
     assert save_path.suffix == "", "Please provide a path without extension"
     retro_tree = create_tree_from_path_string(path_string=path_string)
 

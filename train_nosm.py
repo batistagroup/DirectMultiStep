@@ -26,8 +26,8 @@ from pathlib import Path
 from DirectMultiStep.Models.Configure import (
     prepare_model,
     determine_device,
-    VanillaTransformerConfig,
 )
+from DirectMultiStep.Models.Architecture import VanillaTransformerConfig
 from DirectMultiStep.Models.Training import PLTraining
 from lightning.pytorch.callbacks import ModelCheckpoint
 from lightning.pytorch.callbacks import RichModelSummary

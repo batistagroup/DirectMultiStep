@@ -21,13 +21,13 @@
 # SOFTWARE.
 
 import pytest
-from ..Utils.PreProcess import (
+from DirectMultiStep.Utils.PreProcess import (
     filter_mol_nodes,
     max_tree_depth,
     find_leaves,
     generate_permutations,
 )
-from .test_data import (
+from DirectMultiStep.tests.test_data import (
     test1_leaves,
     test2_depth1,
     test3_depth2,
@@ -39,7 +39,7 @@ from .test_data import (
     test9_tknz_smiles,
     test10_tknz_path,
 )
-from ..Utils.Dataset import tokenize_smile, tokenize_path_string
+from DirectMultiStep.Utils.Dataset import tokenize_smile, tokenize_path_string
 
 test_filtering_and_depth = [
     pytest.param(test1_leaves, 0, id="leaves"),

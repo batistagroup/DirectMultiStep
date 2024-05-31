@@ -164,7 +164,9 @@ class BeamSearch:
         return best_k_B_nt
 
     def _generate_final_outputs(
-        self, beam_idxs_BSL_nt: List[List[List[int]]], beam_log_probs_BS_nt: npt.NDArray[np.float64]
+        self,
+        beam_idxs_BSL_nt: List[List[List[int]]],
+        beam_log_probs_BS_nt: npt.NDArray[np.float64],
     ) -> BeamSearchOutput:
         """Convert index sequences to final outputs."""
         B = len(beam_idxs_BSL_nt)
@@ -183,7 +185,7 @@ class BeamSearch:
 
         return outputs_B2_nt
 
-    def decode(self, src_BC: Tensor, steps_B1: Tensor)->BeamSearchOutput:
+    def decode(self, src_BC: Tensor, steps_B1: Tensor) -> BeamSearchOutput:
         """
         src_BC: product + one_sm
         steps_B1: number of steps

@@ -21,11 +21,10 @@
 # SOFTWARE.
 
 from DirectMultiStep.Models.TensorGen import BeamSearchOptimized as BeamSearch
-from DirectMultiStep.Models.Configure import VanillaTransformerConfig, prepare_model
+from DirectMultiStep.Models.Architecture import VanillaTransformerConfig
+from DirectMultiStep.Models.Configure import prepare_model
 from DirectMultiStep.Utils.Dataset import RoutesDataset
 from DirectMultiStep.Utils.PostProcess import (
-    BeamResultType,
-    BeamSearchOutput,
     find_valid_paths,
     process_paths,
 )
@@ -36,6 +35,7 @@ from pathlib import Path
 import lightning as L
 from rdkit import RDLogger  # type: ignore
 import rdkit.Chem as Chem  # type: ignore
+from typing import List, Tuple, cast
 
 RDLogger.DisableLog("rdApp.*")
 
@@ -51,7 +51,7 @@ ckpt_name = "epoch=18-step=497135.ckpt"
 
 
 def canonicalize(smile: str) -> str:
-    return Chem.MolToSmiles(Chem.MolFromSmiles(smile), isomericSmiles=True)
+    return cast(str, Chem.MolToSmiles(Chem.MolFromSmiles(smile), isomericSmiles=True))
 
 
 product = canonicalize("OC(C1=C(N2N=CC=N2)C=CC(OC)=C1)=O")
@@ -122,7 +122,7 @@ BSObject = BeamSearch(
     device=device,
 )
 
-all_beam_results_NS2: BeamSearchOutput = []
+all_beam_results_NS2: List[List[Tuple[str, float]]] = []
 beam_result_BS2 = BSObject.decode(
     src_BC=encoder_inp, steps_B1=steps_tens, path_start_BL=path_tens
 )
