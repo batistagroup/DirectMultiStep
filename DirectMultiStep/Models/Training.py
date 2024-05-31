@@ -22,7 +22,7 @@
 
 import lightning as pl
 import numpy as np
-from typing import Callable, Optional
+from typing import Callable, Optional, Tuple, List, Dict, Any, cast
 import torch
 import torch.nn as nn
 from .Architecture import Seq2Seq
@@ -32,13 +32,13 @@ Tensor = torch.Tensor
 
 def _warmup_and_cosine_decay(
     warmup_steps: int, decay_steps: int, decay_factor: float
-) -> Callable:
-    def _get_new_lr(step):
+) -> Callable[[int], float]:
+    def _get_new_lr(step:int)->float:
         if step < warmup_steps:
             return step / warmup_steps
         elif step >= warmup_steps and step < warmup_steps + decay_steps:
             factor = 0.5 * (1 + np.cos(np.pi * (step - warmup_steps) / decay_steps))
-            return max(factor, decay_factor)
+            return cast(float, max(factor, decay_factor))
         else:
             return decay_factor
 
@@ -81,7 +81,7 @@ class PLTraining(pl.LightningModule):
         masked_src_BC[final_mask_BC] = self.mask_idx
         return masked_src_BC
 
-    def compute_loss(self, batch, batch_idx):
+    def compute_loss(self, batch:Tensor, batch_idx:int)->Tensor:
         """
         enc_item - product_item + one_sm_item
         dec_item - path_string
@@ -97,9 +97,9 @@ class PLTraining(pl.LightningModule):
         tgt_bl = tgt_item_BL[:, 1:].reshape(-1)  # [B*(L-1)]
         loss = self.criterion(output_blV, tgt_bl)
         self.processed_tokens += tgt_item_BL.shape[0] * tgt_item_BL.shape[1]
-        return loss
+        return cast(Tensor, loss)
 
-    def log_step_info(self, loss, mode: str, prog_bar: bool):
+    def log_step_info(self, loss:Tensor, mode: str, prog_bar: bool)->None:
         self.log(
             f"{mode}_loss",
             loss,
@@ -114,17 +114,17 @@ class PLTraining(pl.LightningModule):
                 f"{mode}_lr", current_lr, batch_size=self.batch_size, sync_dist=True
             )
 
-    def training_step(self, batch, batch_idx):
+    def training_step(self, batch:Tensor, batch_idx:int)->Tensor:
         loss = self.compute_loss(batch, batch_idx)
         self.log_step_info(loss, "train", prog_bar=True)
         return loss
 
-    def validation_step(self, batch, batch_idx):
+    def validation_step(self, batch:Tensor, batch_idx:int)->Tensor:
         loss = self.compute_loss(batch, batch_idx)
         self.log_step_info(loss, "val", prog_bar=True)
         return loss
 
-    def configure_optimizers(self):
+    def configure_optimizers(self)->Tuple[List[torch.optim.Optimizer], List[Dict[str, Any]]]:
         optimizer = torch.optim.AdamW(self.parameters(), lr=self.learning_rate)
         # return optimizer
         scheduler = torch.optim.lr_scheduler.LambdaLR(

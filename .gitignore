@@ -9,6 +9,7 @@ Data/PaRoutes/*json
 Data/Processed/pre_perms
 Data/Processed/*pkl
 Data/Training/
+Data/Figures/
 *pkl
 
 .coverage

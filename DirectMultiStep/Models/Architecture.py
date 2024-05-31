@@ -39,13 +39,65 @@ K: size of each attention key or value (sometimes called d_kv)
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from typing import Tuple, Optional
+from typing import Tuple, Optional, Any, cast
 
 Tensor = torch.Tensor
 
 
+class ModelConfig:
+
+    def __init__(
+        self,
+        input_dim: int,
+        output_dim: int,
+        input_max_length: int,
+        output_max_length: int,
+        pad_index: int,
+        hid_dim: int = 256,
+        n_layers: int = 6,
+        n_heads: int = 8,
+        ff_mult: int = 4,
+        dropout: float = 0.1,
+        attn_bias: bool = False,
+        ff_activation: str = "gelu",
+    ):
+        self.input_dim = input_dim  # Total input dimensions including padding
+        self.input_max_length = input_max_length
+        self.pad_index = pad_index
+
+        self.output_dim = output_dim
+        self.output_max_length = output_max_length
+
+        if hid_dim % n_heads != 0:
+            raise ValueError(f"{hid_dim=} must be divisible by {n_heads=}")
+        self.hid_dim = hid_dim  # dimensionality of embedding, D
+        self.n_heads = n_heads  # number of heads
+        self.n_layers = n_layers  # number of layers
+        self.ff_mult = ff_mult  # multiplier for feedforward layer
+        self.dropout = dropout
+        self.attn_bias = attn_bias
+        self.ff_activation: nn.Module
+        if ff_activation == "gelu":
+            self.ff_activation = nn.GELU()
+        elif ff_activation == "relu":
+            self.ff_activation = nn.ReLU()
+        else:
+            raise ValueError("attn_activation must be 'gelu' or 'relu'")
+
+        self.ff_type: str
+        self.top_k: int
+        self.n_experts: int
+
+
+class VanillaTransformerConfig(ModelConfig):
+    ff_type = "vanilla"
+
+    def __init__(self, **kwargs: Any) -> None:
+        super().__init__(**kwargs)
+
+
 class MultiHeadAttentionLayer(nn.Module):
-    def __init__(self, config, device: torch.device):
+    def __init__(self, config: ModelConfig, device: torch.device):
         super().__init__()
 
         self.hid_dim = config.hid_dim
@@ -97,12 +149,12 @@ class MultiHeadAttentionLayer(nn.Module):
         attn_output_BLD = (
             attn_output_BHLD.permute(0, 2, 1, 3).contiguous().view(B, L, self.hid_dim)
         )
-        output_BLD = self.projection(attn_output_BLD)
-        return output_BLD
+        output_BLD = cast(Tensor, self.projection(attn_output_BLD))
+        return output_BLD 
 
 
 class PositionwiseFeedforwardLayer(nn.Module):
-    def __init__(self, config):
+    def __init__(self, config: ModelConfig):
         super().__init__()
 
         self.fc_1 = nn.Linear(config.hid_dim, config.ff_mult * config.hid_dim)
@@ -118,7 +170,7 @@ class PositionwiseFeedforwardLayer(nn.Module):
 
 
 class NoisyTopkRouter(nn.Module):
-    def __init__(self, config):
+    def __init__(self, config: ModelConfig):
         super().__init__()
         self.top_k = config.top_k
         self.topkroute_linear = nn.Linear(config.hid_dim, config.n_experts)
@@ -144,7 +196,7 @@ class NoisyTopkRouter(nn.Module):
 
 
 class Expert(nn.Module):
-    def __init__(self, config):
+    def __init__(self, config: ModelConfig):
         super().__init__()
         self.net = nn.Sequential(
             nn.Linear(config.hid_dim, config.ff_mult * config.hid_dim),
@@ -154,11 +206,11 @@ class Expert(nn.Module):
         )
 
     def forward(self, x_BLD: Tensor) -> Tensor:
-        return self.net(x_BLD)
+        return self.net(x_BLD)  # type: ignore
 
 
 class SparseMoE(nn.Module):
-    def __init__(self, config):
+    def __init__(self, config: ModelConfig):
         super(SparseMoE, self).__init__()
         self.router = NoisyTopkRouter(config)
         self.experts = nn.ModuleList([Expert(config) for _ in range(config.n_experts)])
@@ -196,7 +248,7 @@ class SparseMoE(nn.Module):
 
 
 class EncoderLayer(nn.Module):
-    def __init__(self, config, device: torch.device):
+    def __init__(self, config: ModelConfig, device: torch.device):
         super().__init__()
 
         self.attn_ln = nn.LayerNorm(config.hid_dim)
@@ -216,11 +268,11 @@ class EncoderLayer(nn.Module):
         src_BCD = self.attn_ln(input_BCD + self.dropout(attn_output_BCD))
         ff_out_BCD = self.mlp(src_BCD)
         final_out_BLD = self.ff_ln(src_BCD + self.dropout(ff_out_BCD))
-        return final_out_BLD
+        return cast(Tensor, final_out_BLD)
 
 
 class Encoder(nn.Module):
-    def __init__(self, config, device: torch.device):
+    def __init__(self, config: ModelConfig, device: torch.device):
         super().__init__()
 
         self.hid_dim = config.hid_dim  # D
@@ -253,11 +305,11 @@ class Encoder(nn.Module):
         src_BCD = self.dropout(tok_emb_BCD + pos_emb_BCD + step_emb_BCD)
         for layer in self.layers:
             src_BCD = layer(src_BCD, src_mask_B11C)
-        return src_BCD
+        return cast(Tensor, src_BCD)
 
 
 class DecoderLayer(nn.Module):
-    def __init__(self, config, device: torch.device):
+    def __init__(self, config: ModelConfig, device: torch.device):
         super().__init__()
         self.self_attn_ln = nn.LayerNorm(config.hid_dim)
         self.enc_attn_ln = nn.LayerNorm(config.hid_dim)
@@ -293,7 +345,7 @@ class DecoderLayer(nn.Module):
 
 
 class Decoder(nn.Module):
-    def __init__(self, config, device):
+    def __init__(self, config: ModelConfig, device: torch.device):
         super().__init__()
 
         self.hid_dim = config.hid_dim
@@ -325,7 +377,7 @@ class Decoder(nn.Module):
         for layer in self.layers:
             trg_BLD = layer(trg_BLD, enc_src_BCD, src_mask_B11C, trg_mask_B1LL)
         output_BLV = self.fc_out(trg_BLD)
-        return output_BLV
+        return cast(Tensor, output_BLV)
 
 
 class Seq2Seq(nn.Module):
@@ -359,4 +411,4 @@ class Seq2Seq(nn.Module):
         output_BLV = self.decoder(
             trg_BL, enc_src_BCD, src_mask_B11C, trg_mask_B1LL=trg_mask
         )
-        return output_BLV
+        return cast(Tensor, output_BLV)

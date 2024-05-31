@@ -88,7 +88,7 @@ def canonicalize_smiles(smiles: str) -> str:
     """
     Canonicalize the SMILES using RDKit.
     """
-    return Chem.MolToSmiles(Chem.MolFromSmiles(smiles))
+    return cast(str, Chem.MolToSmiles(Chem.MolFromSmiles(smiles)))
 
 
 def stringify_dict(data: FilteredDict) -> str:

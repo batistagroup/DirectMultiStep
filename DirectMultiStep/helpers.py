@@ -28,53 +28,51 @@ import re
 
 
 def prepare_datasets(
-    train_data_path: str,
-    val_data_path: str,
-    metadata_path: str,
+    train_data_path: str | Path,
+    val_data_path: str | Path,
+    metadata_path: str | Path,
 ) -> Tuple[RoutesStepsSMDataset, ...]:
-    (products, starting_materials, path_strings, n_steps_list) = pickle.load(
-        open(train_data_path, "rb")
-    )
+    with open(train_data_path, "rb") as f:
+        (products, starting_materials, path_strings, n_steps_list) = pickle.load(f)
     ds_train = RoutesStepsSMDataset(
         products=products,
         starting_materials=starting_materials,
         path_strings=path_strings,
         n_steps_list=n_steps_list,
-        metadata_path=metadata_path,
+        metadata_path=str(metadata_path),
     )
-    (n1_products, n1_sms, n1_path_strings, n1_steps_list) = pickle.load(
-        open(val_data_path, "rb")
-    )
+    with open(val_data_path, "rb") as f:
+        (n1_products, n1_sms, n1_path_strings, n1_steps_list) = pickle.load(f)
     ds_val = RoutesStepsSMDataset(
         products=n1_products,
         starting_materials=n1_sms,
         path_strings=n1_path_strings,
         n_steps_list=n1_steps_list,
-        metadata_path=metadata_path,
+        metadata_path=str(metadata_path),
     )
     return ds_train, ds_val
 
 
 def prepare_datasets_nosm(
-    train_data_path: str,
-    val_data_path: str,
-    metadata_path: str,
+    train_data_path: str | Path,
+    val_data_path: str | Path,
+    metadata_path: str | Path,
 ) -> Tuple[RoutesStepsDataset, ...]:
-    (products, path_strings, n_steps_list) = pickle.load(open(train_data_path, "rb"))
+    with open(train_data_path, "rb") as f:
+        (products, path_strings, n_steps_list) = pickle.load(f)
     ds_train = RoutesStepsDataset(
         products=products,
         path_strings=path_strings,
         n_steps_list=n_steps_list,
-        metadata_path=metadata_path,
+        metadata_path=str(metadata_path),
     )
-    (n1_products, n1_path_strings, n1_steps_list) = pickle.load(
-        open(val_data_path, "rb")
-    )
+    with open(val_data_path, "rb") as f:
+        (n1_products, n1_path_strings, n1_steps_list) = pickle.load(f)
     ds_val = RoutesStepsDataset(
         products=n1_products,
         path_strings=n1_path_strings,
         n_steps_list=n1_steps_list,
-        metadata_path=metadata_path,
+        metadata_path=str(metadata_path),
     )
     return ds_train, ds_val
 

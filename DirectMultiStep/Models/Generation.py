@@ -40,6 +40,7 @@ import torch
 import torch.nn as nn
 from tqdm import tqdm
 import numpy as np
+import numpy.typing as npt
 from typing import List, Dict, Tuple
 
 # Define types
@@ -70,8 +71,8 @@ class BeamSearch:
 
     def _prepare_beam_tensors(
         self, src_BC: Tensor, enc_src_BCD: Tensor
-    ) -> Tuple[Tensor, Tensor, List[List[List[int]]], np.ndarray, Tensor]:
-        B, C, D = enc_src_BCD.shape
+    ) -> Tuple[Tensor, Tensor, List[List[List[int]]], npt.NDArray[np.float64], Tensor]:
+        B = enc_src_BCD.shape[0]
         S = self.beam_size
 
         beam_enc_WCD = enc_src_BCD.repeat_interleave(S, dim=0)  # W = B * S
@@ -95,7 +96,7 @@ class BeamSearch:
         self,
         output_BSLS: Tensor,
         beam_idxs_BSL_nt: List[List[List[int]]],
-        beam_log_probs_BS_nt: np.ndarray,
+        beam_log_probs_BS_nt: npt.NDArray[np.float64],
     ) -> Tuple[List[List[float]], List[List[List[int]]]]:
         """Generate expanded candidate sequences and their probabilities."""
         B = len(beam_idxs_BSL_nt)
@@ -142,7 +143,7 @@ class BeamSearch:
         candidate_probs_BS_nt: List[List[float]],
         candidate_seqs_BSL_nt: List[List[List[int]]],  # S is actually 2S
         debug: bool = False,
-    ) -> List[np.ndarray]:
+    ) -> List[npt.NDArray[np.int_]]:
         """Normalize probabilities and select top-k candidates."""
         B = len(candidate_probs_BS_nt)
         best_k_B_nt = []
@@ -163,7 +164,7 @@ class BeamSearch:
         return best_k_B_nt
 
     def _generate_final_outputs(
-        self, beam_idxs_BSL_nt: List[List[List[int]]], beam_log_probs_BS_nt: np.ndarray
+        self, beam_idxs_BSL_nt: List[List[List[int]]], beam_log_probs_BS_nt: npt.NDArray[np.float64]
     ) -> BeamSearchOutput:
         """Convert index sequences to final outputs."""
         B = len(beam_idxs_BSL_nt)
@@ -182,7 +183,7 @@ class BeamSearch:
 
         return outputs_B2_nt
 
-    def decode(self, src_BC: Tensor, steps_B1: Tensor):
+    def decode(self, src_BC: Tensor, steps_B1: Tensor)->BeamSearchOutput:
         """
         src_BC: product + one_sm
         steps_B1: number of steps

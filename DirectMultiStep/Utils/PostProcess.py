@@ -20,20 +20,19 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
 
-from ..Models.Generation import BeamSearchOutput
 from .PreProcess import (
     canonicalize_smiles,
     find_leaves,
     generate_permutations,
-    FilteredDict,
     stringify_dict,
     max_tree_depth,
 )
-from typing import List, Tuple, Dict, Set, Optional, Iterator, cast
+from typing import List, Tuple, Dict, Set, Optional, Iterator, Union, cast
 import json
 from tqdm import tqdm
 
-BeamResultType = List[BeamSearchOutput]
+FilteredDict = Dict[str, Union[str, List["FilteredDict"]]]
+BeamResultType = List[List[Tuple[str, float]]]
 PathReacType = Tuple[str, List[str]]
 BeamProcessedType = List[PathReacType]
 PathsProcessedType = List[BeamProcessedType]
@@ -47,7 +46,7 @@ def find_valid_paths(
         print("Starting to find valid paths:")
     valid_pathreac_NS2n = []
     iterator = tqdm(beam_results_NS2) if verbose else beam_results_NS2
-    for beam_result_S2 in iterator:  # type: ignore
+    for beam_result_S2 in cast(Iterator[List[Tuple[str, float]]], iterator):
         valid_pathreac_S2n = []
         for path_string, _ in beam_result_S2:
             try:
@@ -78,7 +77,7 @@ def find_matching_paths(
         if verbose
         else zip(paths_NS2n, correct_paths)
     )
-    for pathreac_S2n, correct_path in iterator:  # type: ignore
+    for pathreac_S2n, correct_path in cast(Iterator[Tuple[BeamProcessedType, str]], iterator): 
         path_match = None
         path_match_perm = None
         for rank, (path, _) in enumerate(pathreac_S2n):
@@ -120,7 +119,7 @@ def remove_repetitions_within_beam_result(
         print("Starting to remove repetitions within beam results:")
     unique_paths_NS2n = []
     iterator = tqdm(paths_NS2n) if verbose else paths_NS2n
-    for path_reac_S2 in cast(Iterator, iterator):
+    for path_reac_S2 in cast(Iterator[BeamProcessedType], iterator):
         unique_paths_S2n = []
         seen = set()
         for path, reacs_n in path_reac_S2:
@@ -143,7 +142,7 @@ def find_paths_with_commercial_sm(
         print("Starting to find paths with commercial reactants:")
     available_paths_NS2n = []
     iterator = tqdm(paths_NS2n) if verbose else paths_NS2n
-    for path_reac_S2 in cast(Iterator, iterator):
+    for path_reac_S2 in cast(Iterator[BeamProcessedType], iterator):
         available_paths_S2n = []
         for path, reacs_n in path_reac_S2:
             if all(reactant in commercial_stock for reactant in reacs_n):
@@ -163,7 +162,7 @@ def find_paths_with_correct_product_and_reactants(
     f = canonicalize_smiles
     correct_paths_NS2n = []
     iterator = tqdm(enumerate(paths_NS2n)) if verbose else enumerate(paths_NS2n)
-    for idx, path_reac_S2 in cast(Iterator, iterator):
+    for idx, path_reac_S2 in cast(Iterator[Tuple[int, BeamProcessedType]], iterator):
         correct_paths_S2n = []
         for path, reacs_n in path_reac_S2:
             path_tree = eval(path)
@@ -181,7 +180,7 @@ def canonicalize_path_dict(path_dict: FilteredDict) -> FilteredDict:
     if "children" in path_dict:
         canon_dict["children"] = []
         for child in path_dict["children"]:
-            cast(list, canon_dict["children"]).append(
+            cast(List[FilteredDict], canon_dict["children"]).append(
                 canonicalize_path_dict(cast(FilteredDict, child))
             )
     return canon_dict
@@ -200,7 +199,7 @@ def canonicalize_paths(
     canon_paths_NS2n = []
     counter = 0
     iterator = tqdm(paths_NS2n) if verbose else paths_NS2n
-    for path_reac_S2 in cast(Iterator, iterator):
+    for path_reac_S2 in cast(Iterator[BeamProcessedType], iterator):
         canon_paths_S2n = []
         for path, reacs_n in path_reac_S2:
             try:

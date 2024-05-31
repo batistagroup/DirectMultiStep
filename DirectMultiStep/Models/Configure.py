@@ -22,10 +22,10 @@
 
 import torch
 import torch.nn as nn
-from .Architecture import Encoder, Decoder, Seq2Seq
+from .Architecture import Encoder, Decoder, Seq2Seq, ModelConfig
 
 
-def count_parameters(model):
+def count_parameters(model:nn.Module)->int:
     return sum(p.numel() for p in model.parameters() if p.requires_grad)
 
 
@@ -40,48 +40,7 @@ def determine_device(allow_mps: bool = False) -> str:
     return device
 
 
-class VanillaTransformerConfig:
-    ff_type = "vanilla"
-
-    def __init__(
-        self,
-        input_dim: int,
-        output_dim: int,
-        input_max_length: int,
-        output_max_length: int,
-        pad_index: int,
-        hid_dim: int = 256,
-        n_layers: int = 6,
-        n_heads: int = 8,
-        ff_mult: int = 4,
-        dropout: float = 0.1,
-        attn_bias: bool = False,
-        ff_activation: str = "gelu",
-    ):
-        self.input_dim = input_dim  # Total input dimensions including padding
-        self.input_max_length = input_max_length
-        self.pad_index = pad_index
-
-        self.output_dim = output_dim
-        self.output_max_length = output_max_length
-
-        assert hid_dim % n_heads == 0, "hid_dim must be divisible by n_heads"
-        self.hid_dim = hid_dim  # dimensionality of embedding, D
-        self.n_heads = n_heads  # number of heads
-        self.n_layers = n_layers  # number of layers
-        self.ff_mult = ff_mult  # multiplier for feedforward layer
-        self.dropout = dropout
-        self.attn_bias = attn_bias
-        self.ff_activation: nn.Module
-        if ff_activation == "gelu":
-            self.ff_activation = nn.GELU()
-        elif ff_activation == "relu":
-            self.ff_activation = nn.ReLU()
-        else:
-            raise ValueError("attn_activation must be 'gelu' or 'relu'")
-
-
-def prepare_model(enc_config, dec_config):
+def prepare_model(enc_config:ModelConfig, dec_config:ModelConfig)->nn.Module:
     device = torch.device(determine_device())
     encoder = Encoder(config=enc_config, device=device)
     decoder = Decoder(config=dec_config, device=device)

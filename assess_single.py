@@ -23,13 +23,19 @@
 from DirectMultiStep.Models.TensorGen import BeamSearchOptimized as BeamSearch
 from DirectMultiStep.Models.Configure import VanillaTransformerConfig, prepare_model
 from DirectMultiStep.Utils.Dataset import RoutesDataset
-from DirectMultiStep.Utils.PostProcess import BeamResultType, find_valid_paths, process_paths
+from DirectMultiStep.Utils.PostProcess import (
+    BeamResultType,
+    BeamSearchOutput,
+    find_valid_paths,
+    process_paths,
+)
+from DirectMultiStep.Utils.Visualize import draw_tree_from_path_string
 import torch
 import yaml
 from pathlib import Path
 import lightning as L
-from rdkit import RDLogger
-from tqdm import tqdm
+from rdkit import RDLogger  # type: ignore
+import rdkit.Chem as Chem  # type: ignore
 
 RDLogger.DisableLog("rdApp.*")
 
@@ -43,10 +49,13 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 run_name = "van_6x3_6x3_010"
 ckpt_name = "epoch=18-step=497135.ckpt"
 
-import rdkit.Chem as Chem
-canonicalize = lambda smile: Chem.MolToSmiles(Chem.MolFromSmiles(smile), isomericSmiles=True)
-product=canonicalize("OC(C1=C(N2N=CC=N2)C=CC(OC)=C1)=O")
-sm= canonicalize("N1=CC=NN1")
+
+def canonicalize(smile: str) -> str:
+    return Chem.MolToSmiles(Chem.MolFromSmiles(smile), isomericSmiles=True)
+
+
+product = canonicalize("OC(C1=C(N2N=CC=N2)C=CC(OC)=C1)=O")
+sm = canonicalize("N1=CC=NN1")
 n_steps = 2
 
 L.seed_everything(42)
@@ -59,9 +68,7 @@ with open(processed_path / "character_dictionary.yaml", "rb") as file:
     sm_max_length = data["sm_max_length"]
 
 
-rds = RoutesDataset()
-rds.token_to_idx = token_to_idx
-rds.seq_pad_index = 52
+rds = RoutesDataset(metadata_path=str(processed_path / "character_dictionary.yaml"))
 prod_tens = rds.smile_to_tokens(product, product_max_length)
 sm_tens = rds.smile_to_tokens(sm, sm_max_length)
 encoder_inp = torch.cat([prod_tens, sm_tens], dim=0).unsqueeze(0)
@@ -115,7 +122,7 @@ BSObject = BeamSearch(
     device=device,
 )
 
-all_beam_results_NS2: BeamResultType = []
+all_beam_results_NS2: BeamSearchOutput = []
 beam_result_BS2 = BSObject.decode(
     src_BC=encoder_inp, steps_B1=steps_tens, path_start_BL=path_tens
 )
@@ -125,11 +132,15 @@ print(f"{all_beam_results_NS2=}")
 
 valid_paths_NS2n = find_valid_paths(all_beam_results_NS2, verbose=True)
 correct_paths_NS2n = process_paths(
-            paths_NS2n=valid_paths_NS2n, true_products=[product], true_reacs=[sm], commercial_stock=None, verbose=True
-        )
+    paths_NS2n=valid_paths_NS2n,
+    true_products=[product],
+    true_reacs=[sm],
+    commercial_stock=None,
+    verbose=True,
+)
 # correct_paths_NS2n = valid_paths_NS2n
 print(f"Length of correct paths: {len(correct_paths_NS2n[0])}")
-from DirectMultiStep.Utils.Visualize import draw_tree_from_path_string
+
 
 for i, beam_result in enumerate(correct_paths_NS2n[0]):
     draw_tree_from_path_string(

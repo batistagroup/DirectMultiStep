@@ -23,7 +23,11 @@
 import torch
 import lightning as L
 from pathlib import Path
-from DirectMultiStep.Models.Configure import prepare_model, determine_device, VanillaTransformerConfig
+from DirectMultiStep.Models.Configure import (
+    prepare_model,
+    determine_device,
+    VanillaTransformerConfig,
+)
 from DirectMultiStep.Models.Training import PLTraining
 from lightning.pytorch.callbacks import ModelCheckpoint
 from lightning.pytorch.callbacks import RichModelSummary
@@ -39,7 +43,6 @@ max_epochs = 4
 L.seed_everything(42)
 n_devices = 4
 torch.set_float32_matmul_precision("high")
-dl_kwargs = dict(num_workers=0, pin_memory=True)
 
 model_10m = dict(n_layers=6, ff_mult=3, hid_dim=256)
 model_60m = dict(n_layers=8, ff_mult=4, hid_dim=512)
@@ -68,10 +71,18 @@ if __name__ == "__main__":
         metadata_path=data_path / "character_dictionary.yaml",
     )
     dl_train = torch.utils.data.DataLoader(
-        dataset=ds_train, batch_size=batch_size, shuffle=True, **dl_kwargs
+        dataset=ds_train,
+        batch_size=batch_size,
+        shuffle=True,
+        num_workers=120,
+        pin_memory=True,
     )
     dl_val = torch.utils.data.DataLoader(
-        dataset=ds_val, batch_size=batch_size, shuffle=False, **dl_kwargs
+        dataset=ds_val,
+        batch_size=batch_size,
+        shuffle=False,
+        num_workers=120,
+        pin_memory=True,
     )
     criterion = torch.nn.CrossEntropyLoss(ignore_index=pad_idx, reduction="mean")
     lightning_model = PLTraining(
@@ -81,7 +92,7 @@ if __name__ == "__main__":
         criterion=criterion,
         lr=lr,
         batch_size=batch_size,
-        warmup_steps=steps_per_epoch * 0.1,
+        warmup_steps=int(steps_per_epoch * 0.1),
         decay_steps=steps_per_epoch * 20,
         decay_factor=0.1,
     )
@@ -91,7 +102,7 @@ if __name__ == "__main__":
         monitor="val_loss", dirpath=train_path / run_name, save_last=True, save_top_k=1
     )
     model_summary = RichModelSummary(max_depth=2)
-    
+
     trainer = L.Trainer(
         default_root_dir=train_path / run_name,
         max_epochs=max_epochs,

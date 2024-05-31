@@ -39,7 +39,7 @@ def tokenize_path_string(path_string: str, add_eos: bool = True) -> List[str]:
     return tokens
 
 
-class RoutesDataset(Dataset):
+class RoutesDataset(Dataset[Tuple[torch.Tensor,...]]):
     def __init__(self, metadata_path: str) -> None:
         self.products: List[str] = []
 
