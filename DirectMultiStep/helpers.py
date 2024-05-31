@@ -21,65 +21,64 @@
 # SOFTWARE.
 
 import pickle
-from DirectMultiStep.Utils.Dataset import StepSM_Dataset_v2, RoutesStepsDataset
-from typing import Tuple
-from pathlib import Path
 import re
+from pathlib import Path
+from typing import Optional, Tuple
+
+from DirectMultiStep.Utils.Dataset import RoutesStepsDataset, RoutesStepsSMDataset
 
 
 def prepare_datasets(
-    train_data_path: str,
-    val_data_path: str,
-    metadata_path: str,
-) -> Tuple[StepSM_Dataset_v2, StepSM_Dataset_v2]:
-    (products, starting_materials, path_strings, n_steps_list) = pickle.load(
-        open(train_data_path, "rb")
-    )
-    ds_train = StepSM_Dataset_v2(
+    train_data_path: str | Path,
+    val_data_path: str | Path,
+    metadata_path: str | Path,
+) -> Tuple[RoutesStepsSMDataset, ...]:
+    with open(train_data_path, "rb") as f:
+        (products, starting_materials, path_strings, n_steps_list) = pickle.load(f)
+    ds_train = RoutesStepsSMDataset(
         products=products,
         starting_materials=starting_materials,
         path_strings=path_strings,
         n_steps_list=n_steps_list,
-        metadata_path=metadata_path,
+        metadata_path=str(metadata_path),
     )
-    (n1_products, n1_sms, n1_path_strings, n1_steps_list) = pickle.load(
-        open(val_data_path, "rb")
-    )
-    ds_val = StepSM_Dataset_v2(
+    with open(val_data_path, "rb") as f:
+        (n1_products, n1_sms, n1_path_strings, n1_steps_list) = pickle.load(f)
+    ds_val = RoutesStepsSMDataset(
         products=n1_products,
         starting_materials=n1_sms,
         path_strings=n1_path_strings,
         n_steps_list=n1_steps_list,
-        metadata_path=metadata_path,
+        metadata_path=str(metadata_path),
     )
     return ds_train, ds_val
 
+
 def prepare_datasets_nosm(
-    train_data_path: str,
-    val_data_path: str,
-    metadata_path: str,
-) -> Tuple[RoutesStepsDataset, RoutesStepsDataset]:
-    (products, path_strings, n_steps_list) = pickle.load(
-        open(train_data_path, "rb")
-    )
+    train_data_path: str | Path,
+    val_data_path: str | Path,
+    metadata_path: str | Path,
+) -> Tuple[RoutesStepsDataset, ...]:
+    with open(train_data_path, "rb") as f:
+        (products, path_strings, n_steps_list) = pickle.load(f)
     ds_train = RoutesStepsDataset(
         products=products,
         path_strings=path_strings,
         n_steps_list=n_steps_list,
-        metadata_path=metadata_path,
+        metadata_path=str(metadata_path),
     )
-    (n1_products, n1_path_strings, n1_steps_list) = pickle.load(
-        open(val_data_path, "rb")
-    )
+    with open(val_data_path, "rb") as f:
+        (n1_products, n1_path_strings, n1_steps_list) = pickle.load(f)
     ds_val = RoutesStepsDataset(
         products=n1_products,
         path_strings=n1_path_strings,
         n_steps_list=n1_steps_list,
-        metadata_path=metadata_path,
+        metadata_path=str(metadata_path),
     )
     return ds_train, ds_val
 
-def find_checkpoint(train_path: str, run_name: str) -> Path:
+
+def find_checkpoint(train_path: str | Path, run_name: str) -> Optional[Path]:
     ckpt_path = Path(train_path) / run_name
     checkpoints = list(ckpt_path.glob("*.ckpt"))
 
@@ -87,7 +86,7 @@ def find_checkpoint(train_path: str, run_name: str) -> Path:
     last_checkpoints = [ckpt for ckpt in checkpoints if "last" in ckpt.stem]
     if last_checkpoints:
         # Extract version number if present, else default to 0 (e.g., last.ckpt is treated as v0)
-        def parse_version(ckpt: Path):
+        def parse_version(ckpt: Path) -> int:
             match = re.search(r"last-v(\d+)", ckpt.stem)
             return int(match.group(1)) if match else 0
 
@@ -95,7 +94,7 @@ def find_checkpoint(train_path: str, run_name: str) -> Path:
         return sorted(last_checkpoints, key=parse_version, reverse=True)[0]
 
     # If no "last" file, find the checkpoint with the largest epoch and step
-    def parse_epoch_step(filename: str):
+    def parse_epoch_step(filename: str) -> Tuple[int, int]:
         # This pattern will match 'epoch=X-step=Y.ckpt' and extract X and Y
         match = re.search(r"epoch=(\d+)-step=(\d+)\.ckpt", filename)
         if match:
@@ -104,7 +103,6 @@ def find_checkpoint(train_path: str, run_name: str) -> Path:
 
     checkpoints.sort(key=lambda ckpt: parse_epoch_step(ckpt.name), reverse=True)
     return checkpoints[0] if checkpoints else None
-
 
 
 if __name__ == "__main__":

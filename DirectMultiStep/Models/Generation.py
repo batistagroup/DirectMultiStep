@@ -21,26 +21,28 @@
 # SOFTWARE.
 
 """
-    Shape suffixes convention inspired by
-    https://medium.com/@NoamShazeer/shape-suffixes-good-coding-style-f836e72e24fd
+Shape suffixes convention inspired by
+https://medium.com/@NoamShazeer/shape-suffixes-good-coding-style-f836e72e24fd
 
-    B: batch size
-    C: the length of the input on which conditioning is done
-       in our case input_max_length
-    L: sequence length for decoder, in our case output_max_length
-    M: memory length (length of sequence being attended to)
-    D: model dimension (sometimes called d_model or embedding_dim)
-    V: vocabulary size
-    F: feed-forward subnetwork hidden size
-    H: number of attention heads in a layer
-    K: size of each attention key or value (sometimes called d_kv)
+B: batch size
+C: the length of the input on which conditioning is done
+   in our case input_max_length
+L: sequence length for decoder, in our case output_max_length
+M: memory length (length of sequence being attended to)
+D: model dimension (sometimes called d_model or embedding_dim)
+V: vocabulary size
+F: feed-forward subnetwork hidden size
+H: number of attention heads in a layer
+K: size of each attention key or value (sometimes called d_kv)
 """
 
+from typing import Dict, List, Tuple
+
+import numpy as np
+import numpy.typing as npt
 import torch
 import torch.nn as nn
 from tqdm import tqdm
-import numpy as np
-from typing import List, Dict, Tuple, Union, Optional
 
 # Define types
 Tensor = torch.Tensor
@@ -48,7 +50,6 @@ BeamSearchOutput = List[List[Tuple[str, float]]]
 
 
 class BeamSearch:
-
     def __init__(
         self,
         model: nn.Module,
@@ -71,8 +72,8 @@ class BeamSearch:
 
     def _prepare_beam_tensors(
         self, src_BC: Tensor, enc_src_BCD: Tensor
-    ) -> Tuple[Tensor, Tensor, List[List[List[int]]], np.ndarray, Tensor]:
-        B, C, D = enc_src_BCD.shape
+    ) -> Tuple[Tensor, Tensor, List[List[List[int]]], npt.NDArray[np.float64], Tensor]:
+        B = enc_src_BCD.shape[0]
         S = self.beam_size
 
         beam_enc_WCD = enc_src_BCD.repeat_interleave(S, dim=0)  # W = B * S
@@ -96,14 +97,16 @@ class BeamSearch:
         self,
         output_BSLS: Tensor,
         beam_idxs_BSL_nt: List[List[List[int]]],
-        beam_log_probs_BS_nt: np.ndarray,
+        beam_log_probs_BS_nt: npt.NDArray[np.float64],
     ) -> Tuple[List[List[float]], List[List[List[int]]]]:
         """Generate expanded candidate sequences and their probabilities."""
         B = len(beam_idxs_BSL_nt)
         S = self.beam_size
 
-        candidate_probs_BS_nt = [[] for _ in range(B)]
-        candidate_seqs_BSL_nt = [[] for _ in range(B)]  # S is actually 2S
+        candidate_probs_BS_nt: List[List[float]] = [[] for _ in range(B)]
+        candidate_seqs_BSL_nt: List[List[List[int]]] = [
+            [] for _ in range(B)
+        ]  # S is actually 2S
         # candidate_probs_B_nt, candidate_seqs_B_nt =
         # _candidates(output_BSLS, beam_idxs_BS1_nt, beam_log_probs_BS_nt)
 
@@ -140,8 +143,8 @@ class BeamSearch:
         self,
         candidate_probs_BS_nt: List[List[float]],
         candidate_seqs_BSL_nt: List[List[List[int]]],  # S is actually 2S
-        debug:bool=False,
-    ) -> List[np.ndarray]:
+        debug: bool = False,
+    ) -> List[npt.NDArray[np.int_]]:
         """Normalize probabilities and select top-k candidates."""
         B = len(candidate_probs_BS_nt)
         best_k_B_nt = []
@@ -162,11 +165,13 @@ class BeamSearch:
         return best_k_B_nt
 
     def _generate_final_outputs(
-        self, beam_idxs_BSL_nt: List[List[List[int]]], beam_log_probs_BS_nt: np.ndarray
+        self,
+        beam_idxs_BSL_nt: List[List[List[int]]],
+        beam_log_probs_BS_nt: npt.NDArray[np.float64],
     ) -> BeamSearchOutput:
         """Convert index sequences to final outputs."""
         B = len(beam_idxs_BSL_nt)
-        outputs_B2_nt = [[] for _ in range(B)]
+        outputs_B2_nt: List[List[Tuple[str, float]]] = [[] for _ in range(B)]
 
         for B_idx in range(B):
             for S_idx in range(self.beam_size):
@@ -181,7 +186,7 @@ class BeamSearch:
 
         return outputs_B2_nt
 
-    def decode(self, src_BC: Tensor, steps_B1: Tensor):
+    def decode(self, src_BC: Tensor, steps_B1: Tensor) -> BeamSearchOutput:
         """
         src_BC: product + one_sm
         steps_B1: number of steps
@@ -261,14 +266,17 @@ class BeamSearch:
                 output_BSLS = torch.cat([output_BSLV, pad_tensor], dim=-1)
             else:
                 output_BSLS = output_BSLV
-            candidate_probs_BS_nt, candidate_seqs_BSL_nt = (
-                self._expand_and_normalize_candidates(
-                    output_BSLS, beam_idxs_BS1_nt, beam_log_probs_BS_nt
-                )
+            (
+                candidate_probs_BS_nt,
+                candidate_seqs_BSL_nt,
+            ) = self._expand_and_normalize_candidates(
+                output_BSLS, beam_idxs_BS1_nt, beam_log_probs_BS_nt
             )
 
             best_k_B_nt = self._select_top_k_candidates(
-                candidate_probs_BS_nt, candidate_seqs_BSL_nt, debug=False#step>113-2
+                candidate_probs_BS_nt,
+                candidate_seqs_BSL_nt,
+                debug=False,  # step>113-2
             )
 
             for B_idx in range(B):
@@ -279,7 +287,8 @@ class BeamSearch:
                     beam_log_probs_BS_nt[B_idx][S_idx] = candidate_probs_BS_nt[B_idx][
                         best_k_B_nt[B_idx][S_idx]
                     ]
-            if step > 150: break
+            if step > 150:
+                break
             # if step > 113-2:
             #     breakpoint()
         return self._generate_final_outputs(beam_idxs_BSL_nt, beam_log_probs_BS_nt)

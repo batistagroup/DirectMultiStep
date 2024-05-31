@@ -21,26 +21,26 @@
 # SOFTWARE.
 
 """
-    Shape suffixes convention inspired by
-    https://medium.com/@NoamShazeer/shape-suffixes-good-coding-style-f836e72e24fd
+Shape suffixes convention inspired by
+https://medium.com/@NoamShazeer/shape-suffixes-good-coding-style-f836e72e24fd
 
-    B: batch size
-    C: the length of the input on which conditioning is done
-       in our case input_max_length
-    L: sequence length for decoder, in our case output_max_length
-    M: memory length (length of sequence being attended to)
-    D: model dimension (sometimes called d_model or embedding_dim)
-    V: vocabulary size
-    F: feed-forward subnetwork hidden size
-    H: number of attention heads in a layer
-    K: size of each attention key or value (sometimes called d_kv)
+B: batch size
+C: the length of the input on which conditioning is done
+   in our case input_max_length
+L: sequence length for decoder, in our case output_max_length
+M: memory length (length of sequence being attended to)
+D: model dimension (sometimes called d_model or embedding_dim)
+V: vocabulary size
+F: feed-forward subnetwork hidden size
+H: number of attention heads in a layer
+K: size of each attention key or value (sometimes called d_kv)
 """
+
+from typing import Dict, List, Optional, Tuple
 
 import torch
 import torch.nn as nn
 from tqdm import tqdm
-import numpy as np
-from typing import List, Dict, Tuple, Union, Optional
 
 # Define types
 Tensor = torch.Tensor
@@ -48,7 +48,6 @@ BeamSearchOutput = List[List[Tuple[str, float]]]
 
 
 class BeamSearchOptimized:
-
     def __init__(
         self,
         model: nn.Module,
@@ -69,7 +68,9 @@ class BeamSearchOptimized:
         self.max_length = max_length
         self.idx_to_token = idx_to_token
 
-    def decode(self, src_BC: Tensor, steps_B1: Tensor, path_start_BL:Optional[Tensor]=None) -> BeamSearchOutput:
+    def decode(
+        self, src_BC: Tensor, steps_B1: Tensor, path_start_BL: Optional[Tensor] = None
+    ) -> BeamSearchOutput:
         """
         src_BC: product + one_sm (B, C)
         steps_B1: number of steps (B, 1)
@@ -98,7 +99,7 @@ class BeamSearchOptimized:
             first_step = 1
             beam_log_probs_W = torch.zeros(B * S, device=self.device)
         else:
-            beam_idxs_WL[:, :path_start_BL.size(1)] = path_start_BL
+            beam_idxs_WL[:, : path_start_BL.size(1)] = path_start_BL
             first_step = path_start_BL.size(1)
             beam_log_probs_W = torch.zeros(B * S, device=self.device)
 
@@ -115,7 +116,7 @@ class BeamSearchOptimized:
             W, _, V = output_WLV.shape
             output_WV = output_WLV[:, -1, :]  # Get the last token's logits
             log_probs_WV = torch.log_softmax(output_WV, dim=-1)
-            
+
             finished_sequences_W = torch.any(beam_idxs_WL == self.end_idx, dim=-1)
             active_mask_W = ~finished_sequences_W
             if finished_sequences_W.all():
@@ -134,27 +135,43 @@ class BeamSearchOptimized:
                 active_WV = active_mask_W.unsqueeze(1).expand(-1, V)
                 cur_log_probs_WV = beam_log_probs_W.unsqueeze(1) + log_probs_WV
 
-                _, act_top_k_idxs_WS = torch.topk(cur_log_probs_WV[active_WV].view(-1,V), S, dim=-1)
+                _, act_top_k_idxs_WS = torch.topk(
+                    cur_log_probs_WV[active_WV].view(-1, V), S, dim=-1
+                )
                 act_top_k_idxs_BSS = act_top_k_idxs_WS.view(B, -1, S)
-                
+
                 active_WL = active_mask_W.unsqueeze(-1).repeat(1, L)
                 active_beams_WL = beam_idxs_WL[active_WL].view(-1, L)
                 active_beams_BSL = active_beams_WL.view(B, -1, L)
                 _S = active_beams_BSL.size(1)
                 active_beams_BSSL = active_beams_BSL.unsqueeze(2).repeat(1, 1, S, 1)
                 active_beams_BSSL[..., step] = act_top_k_idxs_BSS
-                active_beams_BSsqL = active_beams_BSSL.view(B, -1, L)  # my candidate_seqs_BSL_nt
-                cur_log_probs_WS = cur_log_probs_WV[active_mask_W].view(-1, V).gather(1, act_top_k_idxs_WS)
+                active_beams_BSsqL = active_beams_BSSL.view(
+                    B, -1, L
+                )  # my candidate_seqs_BSL_nt
+                cur_log_probs_WS = (
+                    cur_log_probs_WV[active_mask_W]
+                    .view(-1, V)
+                    .gather(1, act_top_k_idxs_WS)
+                )
 
                 # cur_log_probs_BSsq = cur_log_probs_WS.view(B, -1) # my candidate_probs_BS_nt
-                sequence_lengths_WL = (active_beams_WL.ne(self.pad_idx).sum(dim=1).float()).unsqueeze(1)
+                sequence_lengths_WL = (
+                    active_beams_WL.ne(self.pad_idx).sum(dim=1).float()
+                ).unsqueeze(1)
 
-                normalized_act_log_probs_WS = cur_log_probs_WS / (sequence_lengths_WL.sqrt() + 1e-6)
+                normalized_act_log_probs_WS = cur_log_probs_WS / (
+                    sequence_lengths_WL.sqrt() + 1e-6
+                )
                 normalized_act_log_probs_BSsq = normalized_act_log_probs_WS.view(B, -1)
                 _, best_idxs_BS = normalized_act_log_probs_BSsq.topk(S, dim=-1)
-                
-                active_beams_WL = active_beams_BSsqL.view(-1, L).gather(0, best_idxs_BS.view(-1).unsqueeze(-1).expand(-1, L))
-                active_log_probs_W = cur_log_probs_WS.view(-1).gather(0, best_idxs_BS.view(-1))
+
+                active_beams_WL = active_beams_BSsqL.view(-1, L).gather(
+                    0, best_idxs_BS.view(-1).unsqueeze(-1).expand(-1, L)
+                )
+                active_log_probs_W = cur_log_probs_WS.view(-1).gather(
+                    0, best_idxs_BS.view(-1)
+                )
 
                 active_beams_BSL = active_beams_WL.view(B, -1, L)
                 active_log_probs_BS = active_log_probs_W.view(B, -1)
@@ -164,24 +181,34 @@ class BeamSearchOptimized:
                 inactive_beams_BSL = inactive_beams_WL.view(B, -1, L)
                 inactive_log_probs_BS = inactive_log_probs_W.view(B, -1)
 
-                both_beams_BSL = torch.cat([active_beams_BSL, inactive_beams_BSL], dim=1)
-                both_log_probs_BS = torch.cat([active_log_probs_BS, inactive_log_probs_BS], dim=1)
+                both_beams_BSL = torch.cat(
+                    [active_beams_BSL, inactive_beams_BSL], dim=1
+                )
+                both_log_probs_BS = torch.cat(
+                    [active_log_probs_BS, inactive_log_probs_BS], dim=1
+                )
 
                 both_beams_WL = both_beams_BSL.view(-1, L)
                 both_log_probs_W = both_log_probs_BS.view(-1)
 
                 both_seq_lengths_W = both_beams_WL.ne(self.pad_idx).sum(dim=1).float()
-                both_normalized_log_probs_WS = both_log_probs_W / (both_seq_lengths_W.sqrt() + 1e-6)
-                both_normalized_log_probs_BSsq = both_normalized_log_probs_WS.view(B, -1)
+                both_normalized_log_probs_WS = both_log_probs_W / (
+                    both_seq_lengths_W.sqrt() + 1e-6
+                )
+                both_normalized_log_probs_BSsq = both_normalized_log_probs_WS.view(
+                    B, -1
+                )
                 _, best_idxs_BS = both_normalized_log_probs_BSsq.topk(S, dim=-1)
-                
-                beam_idxs_WL = both_beams_BSL.gather(1, best_idxs_BS.unsqueeze(-1).expand(-1, -1, L)).view(-1, L)
+
+                beam_idxs_WL = both_beams_BSL.gather(
+                    1, best_idxs_BS.unsqueeze(-1).expand(-1, -1, L)
+                ).view(-1, L)
                 beam_log_probs_W = both_log_probs_BS.gather(1, best_idxs_BS).view(-1)
 
         beam_idxs_BSL = beam_idxs_WL.view(B, S, L)
         beam_log_probs_BS = beam_log_probs_W.view(B, S)
 
-        outputs_B2_nt = [[] for _ in range(B)]
+        outputs_BS2_nt: List[List[Tuple[str, float]]] = [[] for _ in range(B)]
 
         for b in range(B):
             for s in range(S):
@@ -193,6 +220,6 @@ class BeamSearchOptimized:
                         break
                     output_str += self.idx_to_token[L_idx.item()]
                 log_prob = beam_log_probs_BS[b, s].item()
-                outputs_B2_nt[b].append((output_str, log_prob))
+                outputs_BS2_nt[b].append((output_str, log_prob))
 
-        return outputs_B2_nt
+        return outputs_BS2_nt

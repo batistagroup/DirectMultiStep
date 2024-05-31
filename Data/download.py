@@ -1,7 +1,8 @@
-""" Module with script to download public data
+"""Module with script to download public data
 
 Adapted from https://github.com/MolecularAI/PaRoutes/blob/main/data/download_data.py
 """
+
 import os
 import sys
 from pathlib import Path
@@ -33,8 +34,8 @@ FILES_TO_DOWNLOAD = [
 ]
 
 
-def _download_file(url: str, filename: str) -> None:
-    with requests.get(url, stream=True) as response:
+def _download_file(url: str | Path, filename: str | Path) -> None:
+    with requests.get(str(url), stream=True) as response:
         response.raise_for_status()
         total_size = int(response.headers.get("content-length", 0))
         pbar = tqdm.tqdm(
@@ -53,9 +54,7 @@ def main() -> None:
     path.mkdir(parents=True, exist_ok=True)
     for filespec in FILES_TO_DOWNLOAD:
         try:
-            _download_file(
-                filespec["url"], path / filespec["filename"]
-            )
+            _download_file(filespec["url"], path / filespec["filename"])
         except requests.HTTPError as err:
             print(f"Download failed with message {str(err)}")
             sys.exit(1)

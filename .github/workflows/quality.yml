@@ -1,0 +1,35 @@
+name: Code Quality
+
+on: [push, pull_request]
+
+jobs:
+  qualitycheck:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+
+    - name: Set up Python 3.11
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install numpy==1.24.3 torch==2.3.0 rdkit==2023.09.3 pyyaml==6.0
+        pip install pytest pytest-cov lightning==2.2.5 pycairo==1.26.0 cairosvg==2.7.1
+        pip install mypy black isort ruff types-requests types-tqdm types-PyYAML
+
+    - name : Run ruff
+      run: ruff check
+    - name: Run black
+      run: black --check .
+    - name: Run isort
+      run: isort --check --profile black .
+    - name: Run mypy
+      run: mypy --strict . --exclude=tests
+
+    - name: Run tests
+      run: pytest -v

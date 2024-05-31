@@ -20,25 +20,25 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
 
+from typing import Any, Callable, Dict, List, Optional, Tuple, cast
+
 import lightning as pl
 import numpy as np
-from typing import Callable, Optional
 import torch
 import torch.nn as nn
-from .Architecture import Seq2Seq
 
 Tensor = torch.Tensor
 
 
 def _warmup_and_cosine_decay(
     warmup_steps: int, decay_steps: int, decay_factor: float
-) -> Callable:
-    def _get_new_lr(step):
+) -> Callable[[int], float]:
+    def _get_new_lr(step: int) -> float:
         if step < warmup_steps:
             return step / warmup_steps
         elif step >= warmup_steps and step < warmup_steps + decay_steps:
             factor = 0.5 * (1 + np.cos(np.pi * (step - warmup_steps) / decay_steps))
-            return max(factor, decay_factor)
+            return cast(float, max(factor, decay_factor))
         else:
             return decay_factor
 
@@ -55,7 +55,7 @@ class PLTraining(pl.LightningModule):
         warmup_steps: int = 4000,
         decay_steps: int = 24000,
         decay_factor: float = 0.1,
-        model: Optional[Seq2Seq] = None,
+        model: Optional[nn.Module] = None,
         criterion: Optional[nn.Module] = None,
     ):
         super().__init__()
@@ -70,6 +70,7 @@ class PLTraining(pl.LightningModule):
         self.warmup_steps = warmup_steps
         self.decay_steps = decay_steps
         self.decay_factor = decay_factor
+        self.processed_tokens = 0
         self.save_hyperparameters(ignore=["criterion", "model"])
 
     def mask_src(self, src_BC: Tensor, masking_prob: float) -> Tensor:
@@ -80,7 +81,7 @@ class PLTraining(pl.LightningModule):
         masked_src_BC[final_mask_BC] = self.mask_idx
         return masked_src_BC
 
-    def compute_loss(self, batch, batch_idx):
+    def compute_loss(self, batch: Tensor, batch_idx: int) -> Tensor:
         """
         enc_item - product_item + one_sm_item
         dec_item - path_string
@@ -95,9 +96,10 @@ class PLTraining(pl.LightningModule):
         output_blV = output_BLV.view(-1, output_BLV.shape[-1])  # [B*(L-1), V]
         tgt_bl = tgt_item_BL[:, 1:].reshape(-1)  # [B*(L-1)]
         loss = self.criterion(output_blV, tgt_bl)
-        return loss
+        self.processed_tokens += tgt_item_BL.shape[0] * tgt_item_BL.shape[1]
+        return cast(Tensor, loss)
 
-    def log_step_info(self, loss, mode: str, prog_bar: bool):
+    def log_step_info(self, loss: Tensor, mode: str, prog_bar: bool) -> None:
         self.log(
             f"{mode}_loss",
             loss,
@@ -105,24 +107,27 @@ class PLTraining(pl.LightningModule):
             prog_bar=prog_bar,
             sync_dist=True,
         )
+        self.log("processed_tokens", self.processed_tokens, sync_dist=True)
         if mode == "train":
             current_lr = self.trainer.optimizers[0].param_groups[0]["lr"]
             self.log(
                 f"{mode}_lr", current_lr, batch_size=self.batch_size, sync_dist=True
             )
 
-    def training_step(self, batch, batch_idx):
+    def training_step(self, batch: Tensor, batch_idx: int) -> Tensor:
         loss = self.compute_loss(batch, batch_idx)
         self.log_step_info(loss, "train", prog_bar=True)
         return loss
 
-    def validation_step(self, batch, batch_idx):
+    def validation_step(self, batch: Tensor, batch_idx: int) -> Tensor:
         loss = self.compute_loss(batch, batch_idx)
         self.log_step_info(loss, "val", prog_bar=True)
         return loss
 
-    def configure_optimizers(self):
-        optimizer = torch.optim.Adam(self.parameters(), lr=self.learning_rate)
+    def configure_optimizers(
+        self,
+    ) -> Tuple[List[torch.optim.Optimizer], List[Dict[str, Any]]]:
+        optimizer = torch.optim.AdamW(self.parameters(), lr=self.learning_rate)
         # return optimizer
         scheduler = torch.optim.lr_scheduler.LambdaLR(
             optimizer,

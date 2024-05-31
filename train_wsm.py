@@ -20,14 +20,16 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
 
-import torch
-import lightning as L
 from pathlib import Path
-from DirectMultiStep.Models.Configure import prepare_model, determine_device, VanillaTransformerConfig
-from DirectMultiStep.Models.Training import PLTraining
-from lightning.pytorch.callbacks import ModelCheckpoint
-from lightning.pytorch.callbacks import RichModelSummary
+
+import lightning as L
+import torch
+from lightning.pytorch.callbacks import ModelCheckpoint, RichModelSummary
+
 import DirectMultiStep.helpers as helpers
+from DirectMultiStep.Models.Architecture import VanillaTransformerConfig
+from DirectMultiStep.Models.Configure import determine_device, prepare_model
+from DirectMultiStep.Models.Training import PLTraining
 
 data_path = Path(__file__).resolve().parent / "Data" / "Processed"
 train_path = Path(__file__).resolve().parent / "Data" / "Training"
@@ -35,14 +37,10 @@ run_name = "sm_run_name"
 batch_size = 32
 lr = 3e-4
 steps_per_epoch = 30299
-max_epochs = 12+12
+max_epochs = 12 + 12
 L.seed_everything(42)
 n_devices = 4
 torch.set_float32_matmul_precision("high")
-dl_kwargs = dict(num_workers=120, pin_memory=True)
-
-
-sm_config = dict()
 
 model_10m = dict(n_layers=6, ff_mult=3, hid_dim=256)
 model_60m = dict(n_layers=8, ff_mult=4, hid_dim=512)
@@ -71,10 +69,18 @@ if __name__ == "__main__":
         metadata_path=data_path / "character_dictionary.yaml",
     )
     dl_train = torch.utils.data.DataLoader(
-        dataset=ds_train, batch_size=batch_size, shuffle=True, **dl_kwargs
+        dataset=ds_train,
+        batch_size=batch_size,
+        shuffle=True,
+        num_workers=120,
+        pin_memory=True,
     )
     dl_val = torch.utils.data.DataLoader(
-        dataset=ds_val, batch_size=batch_size, shuffle=False, **dl_kwargs
+        dataset=ds_val,
+        batch_size=batch_size,
+        shuffle=False,
+        num_workers=120,
+        pin_memory=True,
     )
     criterion = torch.nn.CrossEntropyLoss(ignore_index=pad_idx, reduction="mean")
     lightning_model = PLTraining(
@@ -84,7 +90,7 @@ if __name__ == "__main__":
         criterion=criterion,
         lr=lr,
         batch_size=batch_size,
-        warmup_steps=steps_per_epoch * 0.1,
+        warmup_steps=int(steps_per_epoch * 0.1),
         decay_steps=steps_per_epoch * 20,
         decay_factor=0.1,
     )
