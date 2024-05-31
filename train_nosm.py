@@ -22,7 +22,7 @@
 
 from pathlib import Path
 
-import lightning as L
+import lightning as L  # type: ignore
 import torch
 from lightning.pytorch.callbacks import ModelCheckpoint, RichModelSummary
 

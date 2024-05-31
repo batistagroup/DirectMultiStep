@@ -23,7 +23,7 @@
 from pathlib import Path
 from typing import List, Tuple, cast
 
-import lightning as L
+import lightning as L  # type:ignore
 import rdkit.Chem as Chem  # type: ignore
 import torch
 import yaml
