@@ -36,12 +36,13 @@ H: number of attention heads in a layer
 K: size of each attention key or value (sometimes called d_kv)
 """
 
+from typing import Dict, List, Tuple
+
+import numpy as np
+import numpy.typing as npt
 import torch
 import torch.nn as nn
 from tqdm import tqdm
-import numpy as np
-import numpy.typing as npt
-from typing import List, Dict, Tuple
 
 # Define types
 Tensor = torch.Tensor

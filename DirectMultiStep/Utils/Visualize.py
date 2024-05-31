@@ -21,12 +21,13 @@
 # SOFTWARE.
 
 import os
-import cairo
-from rdkit import Chem  # type: ignore
-from rdkit.Chem import Draw  # type: ignore
-import cairosvg  # type: ignore
 from pathlib import Path
 from typing import Dict, List, Tuple, Union, cast
+
+import cairo
+import cairosvg  # type: ignore
+from rdkit import Chem  # type: ignore
+from rdkit.Chem import Draw  # type: ignore
 
 FilteredDict = Dict[str, Union[str, List["FilteredDict"]]]
 
@@ -120,12 +121,12 @@ def check_overlap(
 
 
 def draw_rounded_rectangle(
-    ctx: cairo.Context,
+    ctx: cairo.Context,  # type: ignore
     x: int,
     y: int,
     width: int,
     height: int,
-    corner_radius: int,  # type: ignore
+    corner_radius: int,
 ) -> None:
     """Draws a rounded rectangle."""
     ctx.new_sub_path()

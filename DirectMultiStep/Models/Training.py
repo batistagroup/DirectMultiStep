@@ -20,9 +20,10 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
 
+from typing import Any, Callable, Dict, List, Optional, Tuple, cast
+
 import lightning as pl
 import numpy as np
-from typing import Callable, Optional, Tuple, List, Dict, Any, cast
 import torch
 import torch.nn as nn
 

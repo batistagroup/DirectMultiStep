@@ -20,10 +20,11 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
 
-from rdkit import Chem  # type: ignore
-from typing import Dict, List, Set, Union, cast, Optional
 import itertools
-from itertools import permutations, islice
+from itertools import islice, permutations
+from typing import Dict, List, Optional, Set, Union, cast
+
+from rdkit import Chem  # type: ignore
 
 PaRoutesDict = Dict[str, Union[str, bool, List["PaRoutesDict"]]]
 FilteredDict = Dict[str, Union[str, List["FilteredDict"]]]

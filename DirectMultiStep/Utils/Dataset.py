@@ -20,11 +20,12 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
 
-import torch
-from torch.utils.data import Dataset
-from typing import List, Tuple, Optional
-import yaml
 import re
+from typing import List, Optional, Tuple
+
+import torch
+import yaml
+from torch.utils.data import Dataset
 
 
 def tokenize_smile(smile: str) -> List[str]:

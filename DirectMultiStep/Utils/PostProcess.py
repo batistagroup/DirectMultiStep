@@ -20,16 +20,18 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
 
+import json
+from typing import Dict, Iterator, List, Optional, Set, Tuple, Union, cast
+
+from tqdm import tqdm
+
 from .PreProcess import (
     canonicalize_smiles,
     find_leaves,
     generate_permutations,
-    stringify_dict,
     max_tree_depth,
+    stringify_dict,
 )
-from typing import List, Tuple, Dict, Set, Optional, Iterator, Union, cast
-import json
-from tqdm import tqdm
 
 FilteredDict = Dict[str, Union[str, List["FilteredDict"]]]
 BeamResultType = List[List[Tuple[str, float]]]

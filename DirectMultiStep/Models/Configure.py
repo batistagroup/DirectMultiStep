@@ -22,7 +22,8 @@
 
 import torch
 import torch.nn as nn
-from DirectMultiStep.Models.Architecture import Encoder, Decoder, Seq2Seq, ModelConfig
+
+from DirectMultiStep.Models.Architecture import Decoder, Encoder, ModelConfig, Seq2Seq
 
 
 def count_parameters(model: nn.Module) -> int:

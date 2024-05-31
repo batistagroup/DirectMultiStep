@@ -21,10 +21,11 @@
 # SOFTWARE.
 
 import pickle
-from DirectMultiStep.Utils.Dataset import RoutesStepsDataset, RoutesStepsSMDataset
-from typing import Tuple, Optional
-from pathlib import Path
 import re
+from pathlib import Path
+from typing import Optional, Tuple
+
+from DirectMultiStep.Utils.Dataset import RoutesStepsDataset, RoutesStepsSMDataset
 
 
 def prepare_datasets(

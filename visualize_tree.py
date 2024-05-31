@@ -1,5 +1,6 @@
-from DirectMultiStep.Utils.Visualize import draw_tree_from_path_string
 from pathlib import Path
+
+from DirectMultiStep.Utils.Visualize import draw_tree_from_path_string
 
 data_path = Path(__file__).resolve().parent / "Data"
 fig_path = data_path / "Figures"

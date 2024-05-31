@@ -20,22 +20,21 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
 
-from DirectMultiStep.Models.TensorGen import BeamSearchOptimized as BeamSearch
-from DirectMultiStep.Models.Architecture import VanillaTransformerConfig
-from DirectMultiStep.Models.Configure import prepare_model
-from DirectMultiStep.Utils.Dataset import RoutesDataset
-from DirectMultiStep.Utils.PostProcess import (
-    find_valid_paths,
-    process_paths,
-)
-from DirectMultiStep.Utils.Visualize import draw_tree_from_path_string
+from pathlib import Path
+from typing import List, Tuple, cast
+
+import lightning as L
+import rdkit.Chem as Chem  # type: ignore
 import torch
 import yaml
-from pathlib import Path
-import lightning as L
-from rdkit import RDLogger  # type: ignore
-import rdkit.Chem as Chem  # type: ignore
-from typing import List, Tuple, cast
+from rdkit import RDLogger
+
+from DirectMultiStep.Models.Architecture import VanillaTransformerConfig
+from DirectMultiStep.Models.Configure import prepare_model
+from DirectMultiStep.Models.TensorGen import BeamSearchOptimized as BeamSearch
+from DirectMultiStep.Utils.Dataset import RoutesDataset
+from DirectMultiStep.Utils.PostProcess import find_valid_paths, process_paths
+from DirectMultiStep.Utils.Visualize import draw_tree_from_path_string
 
 RDLogger.DisableLog("rdApp.*")
 

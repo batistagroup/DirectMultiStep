@@ -22,16 +22,18 @@
 
 import json
 import pickle
-from tqdm import tqdm
-from DirectMultiStep.Utils.PreProcess import (
-    filter_mol_nodes,
-    max_tree_depth,
-    find_leaves,
-    FilteredDict,
-    generate_permutations,
-)
 from pathlib import Path
-from typing import List, Dict, Union, Set, Optional, cast
+from typing import Dict, List, Optional, Set, Union, cast
+
+from tqdm import tqdm
+
+from DirectMultiStep.Utils.PreProcess import (
+    FilteredDict,
+    filter_mol_nodes,
+    find_leaves,
+    generate_permutations,
+    max_tree_depth,
+)
 
 data_path = Path(__file__).parent / "PaRoutes"
 save_path = Path(__file__).parent / "Processed"

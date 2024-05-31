@@ -20,18 +20,16 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
 
-import torch
-import lightning as L
 from pathlib import Path
-from DirectMultiStep.Models.Configure import (
-    prepare_model,
-    determine_device,
-)
-from DirectMultiStep.Models.Architecture import VanillaTransformerConfig
-from DirectMultiStep.Models.Training import PLTraining
-from lightning.pytorch.callbacks import ModelCheckpoint
-from lightning.pytorch.callbacks import RichModelSummary
+
+import lightning as L
+import torch
+from lightning.pytorch.callbacks import ModelCheckpoint, RichModelSummary
+
 import DirectMultiStep.helpers as helpers
+from DirectMultiStep.Models.Architecture import VanillaTransformerConfig
+from DirectMultiStep.Models.Configure import determine_device, prepare_model
+from DirectMultiStep.Models.Training import PLTraining
 
 data_path = Path(__file__).resolve().parent / "Data" / "Processed"
 train_path = Path(__file__).resolve().parent / "Data" / "Training"
