@@ -22,7 +22,7 @@
 
 from typing import Any, Callable, Dict, List, Optional, Tuple, cast
 
-import lightning as pl  # type: ignore
+import lightning as pl
 import numpy as np
 import torch
 import torch.nn as nn
