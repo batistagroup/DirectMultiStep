@@ -34,9 +34,7 @@ def determine_device(allow_mps: bool = False) -> str:
     device = (
         "cuda"
         if torch.cuda.is_available()
-        else "mps"
-        if allow_mps and torch.backends.mps.is_available()
-        else "cpu"
+        else "mps" if allow_mps and torch.backends.mps.is_available() else "cpu"
     )
     return device
 
