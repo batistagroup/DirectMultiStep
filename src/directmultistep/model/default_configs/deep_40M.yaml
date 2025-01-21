@@ -1,0 +1,30 @@
+encoder:
+  vocab_dim: 53
+  hid_dim: 256
+  n_layers: 12
+  n_heads: 8
+  ff_mult: 3
+  ff_activation: gelu
+  dropout: 0.1
+  attn_bias: false
+  context_window: 145
+  start_idx: 0
+  mask_idx: 51
+  pad_idx: 52
+  initiate_steps: true
+  include_steps: true
+  model_type: EncoderAConfig
+decoder:
+  vocab_dim: 53
+  hid_dim: 256
+  n_layers: 36
+  n_heads: 8
+  ff_mult: 3
+  ff_activation: gelu
+  dropout: 0.1
+  attn_bias: false
+  context_window: 1075
+  start_idx: 0
+  mask_idx: 51
+  pad_idx: 52
+  model_type: TransformerConfig

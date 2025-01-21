@@ -1,33 +1,51 @@
-*/__pycache__/*
-*__pycache__*
-.DS_Store
-.env
-.ipynb
-
-Data/Checkpoints
-Data/PaRoutes/*json
-Data/Processed/pre_perms
-Data/Processed/*pkl
-Data/Training/
-Data/Figures/
-*pkl
-
+# Python
+__pycache__/
+*.py[cod]
+*.so
+*.egg
+*.egg-info/
+dist/
+build/
+eggs/
 .coverage
 htmlcov/
 
-lightning_logs/
-*ipynb
-Data/*sh
-*ckpt
-*pt
-assess_old.py
-assess_og.py
-debug*
-*pickle
-slurm*out
-submit*sh
+# Virtual Environments
+venv/
+.venv/
 
-assess_ref.py
-assess_test.py
-*tar.gz
-*pdf
+# IDE and System Files
+.DS_Store
+.env
+*_cache/
+
+# Data and Model Files
+data/checkpoints/
+data/paroutes/
+data/paroutes/*.json
+data/processed/pre_perms/
+data/processed/*.pkl
+data/training/
+data/figures/
+data/evaluation/
+*.pkl
+*.ckpt
+*.pt
+*.pickle
+
+# Logs and Documentation
+lightning_logs/
+*.log
+*.pdf
+*.tar.gz
+*.zip
+
+# Jupyter Notebooks
+*.ipynb
+
+# Temporary and Debug Files
+debug*
+slurm*.out
+submit*.sh
+qual.sh
+test*.py
