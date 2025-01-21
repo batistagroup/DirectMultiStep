@@ -1,6 +1,7 @@
 [project]
 name = "directmultistep"
 version = "1.0.0"
+requires-python = ">=3.11"
 dependencies = [
     "numpy==1.26.4",
     "pandas==1.5.3",
@@ -16,11 +17,21 @@ dependencies = [
     "svglib==1.5.1",
     "tomli>=2.2.1",
 ]
+authors = [
+    { name = "Anton Morgunov", email = "anton@ischemist.com" },
+    { name = "Yu Shee", email = "yu.shee@yale.edu" },
+    { name = "Haote Li", email = "haote.li@yale.edu" },
+]
+license = { text = "MIT" }
+readme = "README.md"
+
+[project.urls]
+Homepage = "https://github.com/batistagroup/DirectMultiStep"
+Issues = "https://github.com/batistagroup/DirectMultiStep/issues"
 
 [tool.setuptools]
 packages = ["directmultistep"]
-package-dir = {"" = "src"}
-
+package-dir = { "" = "src" }
 
 
 [project.optional-dependencies]
@@ -41,7 +52,7 @@ dev = [
     "mypy-extensions==1.0.0",
     "types-pyyaml",
     "types-tqdm",
-    "types-requests"
+    "types-requests",
 ]
 
 [tool.mypy]
