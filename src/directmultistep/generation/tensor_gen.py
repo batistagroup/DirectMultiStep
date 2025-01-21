@@ -49,7 +49,7 @@ class BeamSearchOptimized:
     def __repr__(self) -> str:
         return f"BeamSearchOptimized(beam_width={self.beam_size}, max_length={self.max_length})"
 
-    def decode(self, src_BC: Tensor, steps_B1: Tensor, path_start_BL: Tensor | None = None) -> BeamSearchOutput:
+    def decode(self, src_BC: Tensor, steps_B1: Tensor | None, path_start_BL: Tensor | None = None) -> BeamSearchOutput:
         """
         src_BC: product + one_sm (B, C)
         steps_B1: number of steps (B, 1)
