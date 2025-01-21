@@ -48,4 +48,3 @@ debug*
 slurm*.out
 submit*.sh
 qual.sh
-test*.py
