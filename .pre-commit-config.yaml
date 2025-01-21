@@ -2,24 +2,30 @@ default_language_version:
   python: python3.11
 
 repos:
-  - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.4.7
-    hooks:
-      - id: ruff
-        args: [ --fix ]
-
-  - repo: https://github.com/psf/black
-    rev: 24.4.2
-    hooks:
-      - id: black
-        types: [python]
-        args: [--check]
-
   - repo: local
     hooks:
+      - id: ruff
+        name: ruff (linter)
+        entry: ruff check --fix
+        language: python
+        types: [python]
+        
+      - id: ruff-format
+        name: ruff (formatter)
+        entry: ruff format
+        language: python
+        types: [python]
+
       - id: isort
         name: isort
         entry: isort
-        language: system
+        language: python
         types: [python]
-        args: [--check,--profile=black]
+        args: [--profile=black]
+
+      # - id: mypy
+      #   name: mypy
+      #   entry: mypy
+      #   language: system
+      #   types: [python]
+      #   args: [--strict, --ignore-missing-imports, --exclude=tests]

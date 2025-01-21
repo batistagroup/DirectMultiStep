@@ -3,47 +3,57 @@
 [![Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
 [![Checked with mypy](https://www.mypy-lang.org/static/mypy_badge.svg)](https://mypy-lang.org/)
 [![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
-[![codecov](https://codecov.io/gh/batistagroup/DirectMultiStep/graph/badge.svg?token=2G1x86tsjc)](https://codecov.io/gh/batistagroup/DirectMultiStep)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://github.com/batistagroup/DirectMultiStep/blob/main/LICENSE)
+[![arXiv](https://img.shields.io/badge/arXiv-2405.13983-b31b1b.svg)](https://arxiv.org/abs/2405.13983)
 
 ## Overview
 
 The preprint for this work is posted on [arXiv](https://arxiv.org/abs/2405.13983).
 
-- [Data/process.py](/Data/process.py) scripts to preprocess PaRoutes dataset and create training and evaluation partitions.
-- [Models/Architecture.py](/DirectMultiStep/Models/Architecture.py) contains definitions of Encoder, Decoder, and combining Seq2Seq module.
-- [Models/Training.py](/DirectMultiStep/Models/Training.py) definition of Lightning Training class
-- [Models/Configure.py](/DirectMultiStep/Models/Configure.py) definiton of model config
-- [Models/Generation.py](/DirectMultiStep/Models/Generation.py) implementation of beam search using python lists
-- [Models/TensorGen.py](/DirectMultiStep/Models/TensorGen.py) implementation of beam search using torch.Tensors to maximize GPU efficiency. Warning: the current algorithm works properly only with batch_size=1 inputs (PRs welcome).
-- [Utils/Dataset.py](/DirectMultiStep/Utils/Dataset.py) definition of custom torch Datasets used for training and evaluation.
-- [Utils/PreProcess.py](/DirectMultiStep/Utils/PreProcess.py) all functions related to preprocessing of the PaRoutes dataset (used by [Data/process.py](/Data/process.py))
-- [Utils/PostProcess.py](/DirectMultiStep/Utils/PostProcess.py) all functions needed to postprocess results of beam search and run evaluations
-- [Utils/Visualize.py](/DirectMultiStep/Utils/Visualize.py) function that draws the synthesis tree as a pdf
+## How to use
 
-For training see:
+Here's a quick example to generate a retrosynthesis route (you can get relevant checkpoints by running `bash download_files.sh`).
 
-- [train_nosm.py](/DirectMultiStep/train_nosm.py) - w/o SM provided to encoder
-- [train_wsm.py](/DirectMultiStep/train_wsm.py) - w/ SM provided to encoder
+```python
+from directmultistep.generate import generate_routes
+from pathlib import Path
 
-Once everything is set up, it's suffice to simply run `python train_wsm.py`.
+data_path = Path(__file__).resolve().parents[1] / "data"
+ckpt_path = data_path / "checkpoints"
+fig_path = data_path / "figures"
+config_path = data_path / "configs" / "dms_dictionary.yaml"
 
-Run `bash download_ckpts.sh` to download our checkpoints from the file storage.
+# Generate a route for a target molecule
+target = "CNCc1cc(-c2ccccc2F)n(S(=O)(=O)c2cccnc2)c1"
+starting_material = "CN"
 
-Finally, we provide [assess_single.py](/assess_single.py) which allows to run our model on a single target compound.
+# Find routes with different models:
+# Using flash model with starting material
+paths = generate_routes(
+    target, 
+    n_steps=2, 
+    starting_material=starting_material, 
+    model="flash", beam_size=5,
+    config_path=config_path, ckpt_dir=ckpt_path
+)
 
-## Tutorials
+# Or use explorer model to automatically determine steps
+paths = generate_routes(
+    target,
+    starting_material=starting_material,
+    model="explorer",
+    beam_size=5,
+    config_path=config_path, ckpt_dir=ckpt_path
+)
+```
 
-To use the tutorials, simply move/copy them to the root directory. This is necessary because the notebooks use relative imports.
+See `use-examples/generate-route.py` to see more examples with other models. Other example scripts include:
 
-- [Tutorials/Basic_Usage.ipynb](/Tutorials/Basic_Usage.ipynb) walks you through how to input your compounds, steps, and starting materials. Visualization of routes in PDF is shown.
-- [Tutorials/Route_Separation.ipynb](/Tutorials/Route_Separation.ipynb) reproduces the route separation results from the paper.
-- [Tutorials/Pharma_Compounds.ipynb](/Tutorials/Pharma_Compounds.ipynb) reproduces the three FDA-approved drug results from the paper.
+- `train-model.py`: Train a new model with customizable configuration for local or cluster environments
+- `eval-subset.py`: Evaluate a trained model on a subset of data
+- `paper-figures.py`: Reproduce figures from the paper
+- `visualize-train-curves.py`: Plot training curves and metrics
 
 ## Licenses
 
 All code is licensed under MIT License. The content of the [pre-print on arXiv](https://arxiv.org/abs/2405.13983) is licensed under CC-BY 4.0.
-
-## TODO
-
-- Bring codecov to 80+.
-- Revise [Models/TensorGen.py](/DirectMultiStep/Models/TensorGen.py) so that it can work with batch size greater than 1.

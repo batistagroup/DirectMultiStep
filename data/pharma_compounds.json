@@ -1,0 +1,26 @@
+[
+    {
+        "name": "Vonoprazan-1",
+        "path": "{'smiles':'CNCc1cc(-c2ccccc2F)n(S(=O)(=O)c2cccnc2)c1','children':[{'smiles':'O=Cc1cc(-c2ccccc2F)n(S(=O)(=O)c2cccnc2)c1','children':[{'smiles':'O=Cc1c[nH]c(-c2ccccc2F)c1'},{'smiles':'O=S(=O)(Cl)c1cccnc1'}]},{'smiles':'CN'}]}"
+    },
+    {
+        "name": "Vonoprazan-2",
+        "path": "{'smiles':'CNCc1cc(-c2ccccc2F)n(S(=O)(=O)c2cccnc2)c1','children':[{'smiles':'CNC(=O)c1cc(-c2ccccc2F)n(S(=O)(=O)c2cccnc2)c1','children':[{'smiles':'CNC(=O)c1c[nH]c(-c2ccccc2F)c1','children':[{'smiles':'O=C(O)c1c[nH]c(-c2ccccc2F)c1','children':[{'smiles':'CCOC(=O)c1c[nH]c(-c2ccccc2F)c1'}]},{'smiles':'CN'}]},{'smiles':'O=S(=O)(Cl)c1cccnc1'}]}]}"
+    },
+    {
+        "name": "Vonoprazan-2 partial",
+        "path": "{'smiles':'CNC(=O)c1cc(-c2ccccc2F)n(S(=O)(=O)c2cccnc2)c1','children':[{'smiles':'CNC(=O)c1c[nH]c(-c2ccccc2F)c1','children':[{'smiles':'O=C(O)c1c[nH]c(-c2ccccc2F)c1','children':[{'smiles':'CCOC(=O)c1c[nH]c(-c2ccccc2F)c1'}]},{'smiles':'CN'}]},{'smiles':'O=S(=O)(Cl)c1cccnc1'}]}"
+    },
+    {
+        "name": "Mitapivat-1",
+        "path": "{'smiles':'O=C(c1ccc(NS(=O)(=O)c2cccc3cccnc23)cc1)N1CCN(CC2CC2)CC1','children':[{'smiles':'O=C(c1ccc(NS(=O)(=O)c2cccc3cccnc23)cc1)N1CCNCC1','children':[{'smiles':'CC(C)(C)OC(=O)N1CCN(C(=O)c2ccc(NS(=O)(=O)c3cccc4cccnc34)cc2)CC1','children':[{'smiles':'O=C(O)c1ccc(NS(=O)(=O)c2cccc3cccnc23)cc1','children':[{'smiles':'CCOC(=O)c1ccc(NS(=O)(=O)c2cccc3cccnc23)cc1','children':[{'smiles':'CCOC(=O)c1ccc(N)cc1'},{'smiles':'O=S(=O)(Cl)c1cccc2cccnc12'}]}]},{'smiles':'CC(C)(C)OC(=O)N1CCNCC1'}]}]},{'smiles':'O=CC1CC1'}]}"
+    },
+    {
+        "name": "Mitapivat-2",
+        "path": "{'smiles':'O=C(c1ccc(NS(=O)(=O)c2cccc3cccnc23)cc1)N1CCN(CC2CC2)CC1','children':[{'smiles':'O=C(O)c1ccc(NS(=O)(=O)c2cccc3cccnc23)cc1','children':[{'smiles':'CCOC(=O)c1ccc(NS(=O)(=O)c2cccc3cccnc23)cc1','children':[{'smiles':'CCOC(=O)c1ccc(N)cc1'},{'smiles':'O=S(=O)(Cl)c1cccc2cccnc12'}]}]},{'smiles':'C1CN(CC2CC2)CCN1'}]}"
+    },
+    {
+        "name": "Daridorexant",
+        "path": "{'smiles':'COc1ccc(-n2nccn2)c(C(=O)N2CCC[C@@]2(C)c2nc3c(C)c(Cl)ccc3[nH]2)c1','children':[{'smiles':'Cc1c(Cl)ccc2[nH]c([C@]3(C)CCCN3)nc12','children':[{'smiles':'Cc1c(Cl)ccc2[nH]c([C@]3(C)CCCN3C(=O)OC(C)(C)C)nc12','children':[{'smiles':'CC(C)(C)OC(=O)N1CCC[C@@]1(C)C(=O)O','children':[{'smiles':'C[C@@]1(C(=O)O)CCCN1'},{'smiles':'CC(C)(C)OC(=O)OC(=O)OC(C)(C)C'}]},{'smiles':'Cc1c(Cl)ccc(N)c1N'}]}]},{'smiles':'COc1ccc(-n2nccn2)c(C(=O)O)c1','children':[{'smiles':'COc1ccc(I)c(C(=O)O)c1'},{'smiles':'c1cn[nH]n1'}]}]}"
+    }
+]

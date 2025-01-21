@@ -1,0 +1,29 @@
+name: Publish Release
+on:
+  release:
+    types: [published]  # Runs when a draft is published
+
+permissions:
+  contents: write
+
+jobs:
+  create_python_package:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install uv
+        uses: astral-sh/setup-uv@v3
+        with:
+          enable-cache: true
+          cache-dependency-glob: uv.lock
+          
+      - name: Set up Python
+        run: uv python install 3.11.4  # Or whatever version I want to use.
+
+      - name: Build
+        run: uv build
+
+      - name: Upload artifacts to release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: dist/*

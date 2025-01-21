@@ -1,0 +1,17 @@
+name: Update Major Minor Tags
+on:
+  push:
+    tags:
+      - "v[0-9]+.[0-9]+.[0-9]+"  # Only run on semantic version tags
+
+permissions:
+  contents: write
+
+jobs:
+  update_major_minor_tags:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Fetch all history for all tags
+      - uses: haya14busa/action-update-semver@v1.2.1

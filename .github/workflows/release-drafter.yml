@@ -1,0 +1,59 @@
+name: Release Drafter
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    types: [opened, reopened, synchronize]
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  process_pr:
+    permissions:
+      contents: write
+      pull-requests: write
+    runs-on: ubuntu-latest
+    steps:
+      - name: Assign labels from commits
+        if: github.event_name == 'pull_request'
+        id: assign-labels
+        uses: mauroalderete/action-assign-labels@v1
+        with:
+          pull-request-number: ${{ github.event.pull_request.number }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          conventional-commits: |
+            conventional-commits:
+              - type: 'breaking_change'
+                nouns: ['BREAKING CHANGE', 'BREAKING', 'MAJOR']
+                labels: ['breaking-change']
+              - type: 'feat'
+                nouns: ['FEATURE', 'Feature', 'feature', 'FEAT', 'Feat', 'feat']
+                labels: ['new-feature']
+              - type: 'fix'
+                nouns: ['FIX', 'Fix', 'fix', 'FIXED', 'Fixed', 'fixed']
+                labels: ['bugfix']
+              - type: 'enhance'
+                nouns: ['ENHANCE', 'Enhance', 'enhance', 'IMPROVEMENT', 'improvement']
+                labels: ['enhancement']
+              - type: 'refactor'
+                nouns: ['REFACTOR', 'Refactor', 'refactor']
+                labels: ['refactor']
+              - type: 'perf'
+                nouns: ['PERF', 'Perf', 'perf', 'PERFORMANCE', 'Performance', 'performance']
+                labels: ['performance']
+              - type: 'docs'
+                nouns: ['DOCS', 'Docs', 'docs', 'DOC', 'Doc', 'doc']
+                labels: ['documentation']
+          maintain-labels-not-matched: false
+          apply-changes: true
+
+      - uses: release-drafter/release-drafter@v6.0.0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
