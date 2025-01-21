@@ -1,12 +1,8 @@
 name: Release Management
 
 on:
-  workflow_run:
-    workflows: ["Release Drafter"]
-    types:
-      - completed
-    branches:
-      - main
+  release:
+    types: [published]  # Runs when a draft is published
 
 permissions:
   contents: write
