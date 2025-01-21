@@ -38,7 +38,7 @@ def load_model(model_name: ModelName, ckpt_dir: Path) -> torch.nn.Module:
         raise ValueError(f"Unknown model name: {model_name}. Available models: {list(MODEL_CHECKPOINTS.keys())}")
 
     preset_name, ckpt_file = MODEL_CHECKPOINTS[model_name]
-    device = torch.device("cpu")  # For now, we'll use CPU for all models
+    device = ModelFactory.determine_device()
     model = ModelFactory.from_preset(preset_name, compile_model=False).create_model()
     return ModelFactory.load_checkpoint(model, ckpt_dir / ckpt_file, device)
 

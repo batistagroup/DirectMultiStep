@@ -23,9 +23,8 @@ repos:
         types: [python]
         args: [--profile=black]
 
-      # - id: mypy
-      #   name: mypy
-      #   entry: mypy
-      #   language: system
-      #   types: [python]
-      #   args: [--strict, --ignore-missing-imports, --exclude=tests]
+      - id: mypy
+        name: mypy
+        entry: mypy
+        language: system
+        types: [python]
