@@ -10,19 +10,36 @@ PaRoutesDict = dict[str, str | bool | list["PaRoutesDict"]]
 
 
 class FilteredDict(TypedDict, total=False):
+    """A dictionary format for multistep routes, used in DirectMultiStep models.
+
+    This dictionary is designed to represent a node in a synthetic route tree.
+    It contains the SMILES string of a molecule and a list of its child nodes.
+    To get its string format, use `stringify_dict`.
+
+    Attributes:
+        smiles: SMILES string of the molecule.
+        children: List of child nodes, each a FilteredDict.
+    """
+
     smiles: str
     children: list["FilteredDict"]
 
 
 def filter_mol_nodes(node: PaRoutesDict) -> FilteredDict:
-    """
-    Remove information like 'metadata', 'rsmi', 'reaction_hash', etc.
-    keep only 'smiles' and 'children' keys in the PaRoutes Data dictionary/json.
-    An example of our data look like:
-    {'smiles': 'COC(=O)c1cc2c(cc1[N+](=O)[O-])OCCO2',
-     'children': [{'smiles': 'COC(=O)c1ccc2c(c1)OCCO2',
-     'children': [{'smiles': 'BrCCBr'}, {'smiles': 'COC(=O)c1ccc(O)c(O)c1'}]}, {'smiles': 'O=[N+]([O-])O'}]}
-     This dictionary will be in string format and can get the dictionary again by calling ```eval(string)```
+    """Filters a PaRoutes dictionary to keep only 'smiles' and 'children' keys.
+
+    This function removes extra information like 'metadata', 'rsmi', and
+    'reaction_hash', keeping only the 'smiles' and 'children' keys. It also
+    canonicalizes the SMILES string using RDKit.
+
+    Args:
+        node: A dictionary representing a node in a PaRoutes data structure.
+
+    Returns:
+        A FilteredDict containing the canonicalized SMILES and filtered children.
+
+    Raises:
+        ValueError: If the 'type' of the node is not 'mol' or if 'children' is not a list.
     """
     # canonicalize smiles by passing through RDKit
     canonical_smiles = Chem.MolToSmiles(Chem.MolFromSmiles(node["smiles"]))
@@ -44,8 +61,13 @@ def filter_mol_nodes(node: PaRoutesDict) -> FilteredDict:
 
 
 def max_tree_depth(node: FilteredDict) -> int:
-    """
-    Get the max step of the tree.
+    """Calculates the maximum depth of a synthetic route tree.
+
+    Args:
+        node: A FilteredDict representing a node in the route tree.
+
+    Returns:
+        The maximum depth of the tree. Returns 0 for a leaf node.
     """
     if "children" not in node:
         return 0  # Leaf node, depth is 0
@@ -59,8 +81,13 @@ def max_tree_depth(node: FilteredDict) -> int:
 
 
 def find_leaves(node: FilteredDict) -> list[str]:
-    """
-    Get the starting materials SMILES (which are the SMILES of leave nodes).
+    """Finds the SMILES strings of all leaf nodes (starting materials) in a route tree.
+
+    Args:
+        node: A FilteredDict representing a node in the route tree.
+
+    Returns:
+        A list of SMILES strings representing the starting materials.
     """
     leaves = []
     if "children" in node:
@@ -72,8 +99,16 @@ def find_leaves(node: FilteredDict) -> list[str]:
 
 
 def canonicalize_smiles(smiles: str) -> str:
-    """
-    Canonicalize the SMILES using RDKit.
+    """Canonicalizes a SMILES string using RDKit.
+
+    Args:
+        smiles: The SMILES string to canonicalize.
+
+    Returns:
+        The canonicalized SMILES string.
+
+    Raises:
+        ValueError: If the SMILES string cannot be parsed by RDKit.
     """
     mol = Chem.MolFromSmiles(smiles)
     if mol is None:
@@ -82,10 +117,31 @@ def canonicalize_smiles(smiles: str) -> str:
 
 
 def stringify_dict(data: FilteredDict) -> str:
+    """Converts a FilteredDict to a string, removing spaces.
+
+    Args:
+        data: The FilteredDict to convert.
+
+    Returns:
+        A string representation of the FilteredDict with no spaces.
+    """
     return str(data).replace(" ", "")
 
 
 def generate_permutations(data: FilteredDict, max_perm: int | None = None) -> list[str]:
+    """Generates permutations of a synthetic route by permuting the order of children.
+
+    This function generates all possible permutations of a synthetic route by
+    rearranging the order of child nodes at each level of the tree. It can
+    optionally limit the number of permutations generated.
+
+    Args:
+        data: A FilteredDict representing the synthetic route.
+        max_perm: An optional integer to limit the number of permutations generated.
+
+    Returns:
+        A list of stringified FilteredDicts representing the permuted routes.
+    """
     if "children" not in data or not data["children"]:
         return [stringify_dict(data)]
 
@@ -110,8 +166,7 @@ def generate_permutations(data: FilteredDict, max_perm: int | None = None) -> li
 
 
 def is_convergent(route: FilteredDict) -> bool:
-    """
-    Determine if a synthesis route is convergent (non-linear).
+    """Determines if a synthesis route is convergent (non-linear).
 
     A route is linear if for every transformation, at most one reactant has children
     (i.e., all other reactants are leaf nodes). A route is convergent if there exists
@@ -121,7 +176,7 @@ def is_convergent(route: FilteredDict) -> bool:
         route: The synthesis route to analyze.
 
     Returns:
-        bool: True if the route is convergent (non-linear), False if it's linear.
+        True if the route is convergent (non-linear), False if it's linear.
     """
     if "children" not in route:
         return False

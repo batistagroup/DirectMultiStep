@@ -73,7 +73,22 @@ def prepare_input_tensors(
     product_max_length: int,
     sm_max_length: int,
 ) -> tuple[torch.Tensor, torch.Tensor | None, torch.Tensor]:
-    """Prepare input tensors for the model."""
+    """Prepare input tensors for the model.
+    Args:
+        target: SMILES string of the target molecule.
+        n_steps: Number of synthesis steps.
+        starting_material: SMILES string of the starting material, if any.
+        rds: RoutesProcessing object for tokenization.
+        product_max_length: Maximum length of the product SMILES sequence.
+        sm_max_length: Maximum length of the starting material SMILES sequence.
+        use_fp16: Whether to use half precision (FP16) for tensors.
+        path_start: Initial path string to start generation from.
+    Returns:
+        A tuple containing:
+            - encoder_inp: Input tensor for the encoder.
+            - steps_tens: Tensor of the number of steps, or None if not provided.
+            - path_tens: Initial path tensor for the decoder.
+    """
     prod_tens = rds.smile_to_tokens(target, product_max_length)
     if starting_material:
         sm_tens = rds.smile_to_tokens(starting_material, sm_max_length)
