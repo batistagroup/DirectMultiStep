@@ -112,7 +112,7 @@ class ModelPlotConfig:
         """Create a new config with dataset information.
 
         Args:
-            dataset: Dataset dictionary.
+            ds_name: Dataset name.
 
         Returns:
             ModelPlotConfig: New config with dataset information.

@@ -133,7 +133,6 @@ class ModelTrainer:
             model: Model to train
             train_dataset: Training dataset
             val_dataset: Validation dataset
-            checkpoint_path: Optional path to checkpoint for resuming training
         """
         lightning_model = self._create_lightning_module(model)
         trainer = self._create_trainer()

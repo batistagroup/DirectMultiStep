@@ -92,8 +92,8 @@ class NoisyTopkRouter(nn.Module):
 
         Returns:
             A tuple containing:
-              - The router output tensor of shape (B, L, E).
-              - The indices of the top-k experts of shape (B, L, K).
+                - The router output tensor of shape (B, L, E).
+                - The indices of the top-k experts of shape (B, L, K).
         """
         logits_BLE = self.topkroute_linear(x_BLD)
         noise_logits_BLE = self.noise_linear(x_BLD)
