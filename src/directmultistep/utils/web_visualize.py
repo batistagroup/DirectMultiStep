@@ -1,6 +1,6 @@
 import base64
 from pathlib import Path
-from typing import Literal, NamedTuple, TypeAlias, cast
+from typing import Literal, NamedTuple, cast
 
 import svgwrite
 from rdkit import Chem
@@ -8,7 +8,8 @@ from rdkit.Chem.Draw import rdMolDraw2D
 from reportlab.graphics import renderPDF
 from svglib.svglib import svg2rlg
 
-FilteredDict: TypeAlias = dict[str, str | list["FilteredDict"]]
+from directmultistep.utils.pre_process import FilteredDict
+
 ThemeType = Literal["light", "dark"]
 
 __support_pdf__ = True
@@ -97,11 +98,11 @@ class RetroSynthesisTree:
         Returns:
             The next available node ID.
         """
-        self.smiles = cast(str, path_dict["smiles"])
+        self.smiles = path_dict["smiles"]
         cur_id = self.node_id + 1
 
         if "children" in path_dict:
-            for child in cast(list[FilteredDict], path_dict["children"]):
+            for child in path_dict["children"]:
                 node = RetroSynthesisTree(idx=cur_id)
                 cur_id = node.build_tree(path_dict=child)
                 self.children.append(node)
