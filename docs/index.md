@@ -14,6 +14,16 @@ You can install the package directly from PyPI:
 pip install directmultistep
 ```
 
+### Development
+
+We welcome any contributions, feel free to clone the repo and create a PR. We recommend using [uv](https://docs.astral.sh/uv/getting-started/installation/):
+
+```bash
+uv venv --python 3.11
+source .venv/bin/activate
+uv pip install -e ".[dev]"
+```
+
 ### Online Demo
 
 Try out our deployed models without any installation at [models.batistalab.com](https://models.batistalab.com).
@@ -51,14 +61,6 @@ paths = generate_routes(
     ckpt_dir="path/to/checkpoints"
 )
 ```
-
-## Documentation
-
-For full documentation of mkdocs use visit [mkdocs.org](https://www.mkdocs.org).
-
-### Local Documentation
-
-To see rendered docs on your laptop, run `mkdocs serve` in project root folder. The output will specify on which port of localhost the docs are rendered.
 
 ## License
 

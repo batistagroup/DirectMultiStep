@@ -20,6 +20,7 @@ venv/
 *_cache/
 
 # Data and Model Files
+site/
 data/checkpoints/
 data/paroutes/
 data/paroutes/*.json
