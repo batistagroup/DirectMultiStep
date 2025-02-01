@@ -58,7 +58,6 @@ def plot_route_length_distribution(
         train_steps: List of route lengths from training set
         n1_steps: List of route lengths from n1 dataset
         n5_steps: List of route lengths from n5 dataset
-        save_path: Optional path to save the figure. If None, figure is not saved.
 
     Returns:
         Plotly figure object containing the visualization
