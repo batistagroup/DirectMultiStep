@@ -111,6 +111,7 @@ def generate_routes(
     model: ModelName | torch.nn.Module,
     config_path: Path,
     ckpt_dir: Path | None = None,
+    commercial_stock: set[str] | None = None,
 ) -> list[str]:
     """Generate synthesis routes using the model.
 
@@ -122,6 +123,7 @@ def generate_routes(
         model: Either a model name or a torch.nn.Module
         config_path: Path to the model configuration file
         ckpt_dir: Directory containing model checkpoints (required if model is a string)
+        stock_set: Set of commercially available starting materials (SMILES).
     """
     # Handle model loading and validation
     if isinstance(model, str):
@@ -155,6 +157,6 @@ def generate_routes(
         paths_NS2n=valid_paths_NS2n,
         true_products=[target],
         true_reacs=[starting_material] if starting_material else None,
-        commercial_stock=None,
+        commercial_stock=commercial_stock,
     )
     return [beam_result[0] for beam_result in correct_paths_NS2n[0]]
