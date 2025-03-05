@@ -1,7 +1,8 @@
 from pathlib import Path
-from typing import Literal
+from typing import Literal, cast
 
 import torch
+import torch.nn as nn
 import yaml
 
 from directmultistep.generation.tensor_gen import BeamSearchOptimized as BeamSearch
@@ -32,15 +33,26 @@ def validate_model_constraints(model_name: ModelName, n_steps: int | None, start
         raise ValueError("explorer XL model does not support step count or starting material specification")
 
 
-def load_model(model_name: ModelName, ckpt_dir: Path) -> torch.nn.Module:
-    """Load a model by name from the available checkpoints."""
+def load_model(model_name: ModelName, ckpt_dir: Path, use_fp16: bool = False) -> torch.nn.Module:
+    """Load a model by name from the available checkpoints.
+
+    Args:
+        model_name: Name of the model to load
+        ckpt_dir: Directory containing model checkpoints
+        use_fp16: Whether to use half precision (FP16) for model weights
+    """
     if model_name not in MODEL_CHECKPOINTS:
         raise ValueError(f"Unknown model name: {model_name}. Available models: {list(MODEL_CHECKPOINTS.keys())}")
 
     preset_name, ckpt_file = MODEL_CHECKPOINTS[model_name]
     device = ModelFactory.determine_device()
     model = ModelFactory.from_preset(preset_name, compile_model=False).create_model()
-    return ModelFactory.load_checkpoint(model, ckpt_dir / ckpt_file, device)
+    model = ModelFactory.load_checkpoint(model, ckpt_dir / ckpt_file, device)
+
+    if use_fp16:
+        model = model.half()  # Convert to FP16
+
+    return cast(nn.Module, model)
 
 
 def create_beam_search(model: torch.nn.Module, beam_size: int, config_path: Path) -> tuple[int, int, BeamSearch]:
@@ -72,6 +84,7 @@ def prepare_input_tensors(
     rds: RoutesProcessing,
     product_max_length: int,
     sm_max_length: int,
+    use_fp16: bool = False,
 ) -> tuple[torch.Tensor, torch.Tensor | None, torch.Tensor]:
     """Prepare input tensors for the model.
     Args:
@@ -100,6 +113,12 @@ def prepare_input_tensors(
     path_start = "{'smiles':'" + target + "','children':[{'smiles':'"
     path_tens = rds.path_string_to_tokens(path_start, max_length=None, add_eos=False).unsqueeze(0)
 
+    if use_fp16:
+        encoder_inp = encoder_inp.half()
+        if steps_tens is not None:
+            steps_tens = steps_tens.half()
+        path_tens = path_tens.half()
+
     return encoder_inp, steps_tens, path_tens
 
 
@@ -112,6 +131,7 @@ def generate_routes(
     config_path: Path,
     ckpt_dir: Path | None = None,
     commercial_stock: set[str] | None = None,
+    use_fp16: bool = False,
 ) -> list[str]:
     """Generate synthesis routes using the model.
 
@@ -124,6 +144,7 @@ def generate_routes(
         config_path: Path to the model configuration file
         ckpt_dir: Directory containing model checkpoints (required if model is a string)
         stock_set: Set of commercially available starting materials (SMILES).
+        use_fp16: Whether to use half precision (FP16) for model weights and computations
     """
     # Handle model loading and validation
     if isinstance(model, str):
@@ -137,7 +158,7 @@ def generate_routes(
 
     # Prepare input tensors
     encoder_inp, steps_tens, path_tens = prepare_input_tensors(
-        target, n_steps, starting_material, rds, product_max_length, sm_max_length
+        target, n_steps, starting_material, rds, product_max_length, sm_max_length, use_fp16
     )
 
     # Run beam search
