@@ -151,7 +151,7 @@ def generate_routes(
         if ckpt_dir is None:
             raise ValueError("ckpt_dir must be provided when model is specified by name")
         validate_model_constraints(model, n_steps, starting_material)
-        model = load_model(model, ckpt_dir)
+        model = load_model(model, ckpt_dir, use_fp16)
 
     rds = RoutesProcessing(metadata_path=config_path)
     product_max_length, sm_max_length, beam_obj = create_beam_search(model, beam_size, config_path)
