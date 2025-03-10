@@ -1,5 +1,6 @@
 import argparse
 import json
+import pickle
 import time
 from pathlib import Path
 
@@ -122,3 +123,5 @@ if __name__ == "__main__":
     logger.info(f"Results: {results}")
     with open(SAVED_COUNT_PATH, "w") as f:
         json.dump(results, f)
+    with open(SAVED_PATH, "wb") as f:
+        pickle.dump(all_paths, f)
