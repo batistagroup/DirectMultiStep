@@ -211,6 +211,31 @@ def find_paths_with_commercial_sm(paths_NS2n: PathsProcessedType, commercial_sto
     return available_paths_NS2n
 
 
+def find_path_strings_with_commercial_sm(paths: list[str], commercial_stock: set[str]) -> list[str]:
+    """Finds path strings that use only commercially available starting materials.
+
+    This function filters a list of path strings, keeping only those where all
+    SMs are present in the provided commercial stock.  Similar to
+    `find_paths_with_commercial_sm`, but operates on path strings directly.
+
+    Args:
+        paths: A list of path strings.
+        commercial_stock: A set of SMILES strings representing commercially
+            available starting materials.
+
+    Returns:
+        A list of path strings containing only paths with commercial starting
+        materials.
+    """
+    good_path = []
+    for path in paths:
+        path_dict = eval(path)
+        leaves = find_leaves(path_dict)
+        if all(sm in commercial_stock for sm in leaves):
+            good_path.append(path)
+    return good_path
+
+
 def find_paths_with_correct_product_and_reactants(
     paths_NS2n: PathsProcessedType,
     true_products: list[str],

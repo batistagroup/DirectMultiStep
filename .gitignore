@@ -29,6 +29,7 @@ data/processed/*.pkl
 data/training/
 data/figures/
 data/evaluation/
+data/datasets/
 *.pkl
 *.ckpt
 *.pt

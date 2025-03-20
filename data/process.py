@@ -13,6 +13,7 @@ from directmultistep.utils.io import (
 )
 from directmultistep.utils.pre_process import (
     FilteredDict,
+    canonicalize_smiles,
     filter_mol_nodes,
     find_leaves,
     generate_permutations,
@@ -102,6 +103,20 @@ class PaRoutesDataset:
 
 # ------- Dataset Processing -------
 print("--- Processing of the PaRoutes dataset begins!")
+print("-- starting to canonicalize n1 and n5 stocks")
+n1_stock = open(data_path / "n1-stock.txt").read().splitlines()
+n5_stock = open(data_path / "n5-stock.txt").read().splitlines()
+
+n1_stock_canon = [canonicalize_smiles(smi) for smi in n1_stock]
+n5_stock_canon = [canonicalize_smiles(smi) for smi in n5_stock]
+
+with open(data_path / "n1-stock.txt", "w") as f:
+    f.write("\n".join(n1_stock_canon))
+
+with open(data_path / "n5-stock.txt", "w") as f:
+    f.write("\n".join(n5_stock_canon))
+
+
 print("-- starting to process n1 Routes")
 n_perms: int | None = None  # None for all
 n_sms: int | None = 1  # None for all
