@@ -1,8 +1,14 @@
 site_name: DirectMultiStep Docs
+repo_url: https://github.com/batistagroup/DirectMultiStep
+repo_name: batistagroup/DirectMultiStep
+copyright: CC-BY 4.0 &copy; 2025 Batista Group
 theme:
   name: material
   features:
     - content.code.copy
+
+extra_css:
+- stylesheets/extra.css
 
 plugins:
 - search
