@@ -6,6 +6,7 @@ theme:
   name: material
   features:
     - content.code.copy
+    - navigation.footer
   palette:
       # Palette toggle for light mode
     - media: "(prefers-color-scheme: light)"
@@ -27,6 +28,7 @@ extra_css:
 plugins:
 - search
 - mkdocstrings
+- material-plausible
 
 markdown_extensions:
   - pymdownx.highlight:
@@ -39,3 +41,30 @@ markdown_extensions:
   - def_list
   - pymdownx.tasklist:
       custom_checkbox: true
+      
+  - admonition
+  - pymdownx.details
+
+extra:
+  analytics:
+    provider: plausible
+    domain: dms.batistalab.com
+
+    # : If using custom domain proxy or self-hosting Plausible,
+    # : uncomment and specify script path here:
+    src: "https://analytics.batistalab.com/js/script.js"
+
+    feedback:
+      title: Was this page helpful?
+      ratings:
+        - icon: material/emoticon-happy-outline
+          name: This page was helpful
+          data: good
+          note: >-
+            Thanks for your feedback!
+
+        - icon: material/emoticon-sad-outline
+          name: This page could be improved
+          data: bad
+          note: >-
+            Thanks for your feedback!
