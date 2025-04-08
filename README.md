@@ -83,7 +83,7 @@ Through [download_files.sh](./download_files.sh) you can download canonicalized 
 ```tex
 @article{Shee2025,
 author = "Yu Shee and Anton Morgunov",
-title = "{Data for "DirectMultiStep: Direct Route Generation for Multistep Retrosynthesis"}",
+title = "{Data for DirectMultiStep: Direct Route Generation for Multistep Retrosynthesis}",
 year = "2025",
 month = "3",
 url = "https://figshare.com/articles/dataset/Data_for_DirectMultiStep_Direct_Route_Generation_for_Multistep_Retrosynthesis_/28629470",
