@@ -6,6 +6,10 @@ DirectMultiStep is a novel multi-step first approach for generating retrosynthes
 
 ## Quick Start
 
+### Online Demo
+
+Try out our deployed models without any installation at [models.batistalab.com](https://models.batistalab.com).
+
 ### Installation
 
 You can install the package directly from PyPI:
@@ -23,10 +27,6 @@ uv venv --python 3.11
 source .venv/bin/activate
 uv pip install -e ".[dev]"
 ```
-
-### Online Demo
-
-Try out our deployed models without any installation at [models.batistalab.com](https://models.batistalab.com).
 
 ### Usage Example
 

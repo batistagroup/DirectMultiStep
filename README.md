@@ -5,10 +5,13 @@
 [![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://github.com/batistagroup/DirectMultiStep/blob/main/LICENSE)
 [![arXiv](https://img.shields.io/badge/arXiv-2405.13983-b31b1b.svg)](https://arxiv.org/abs/2405.13983)
+[![image](https://img.shields.io/pypi/v/DirectMultiStep.svg)](https://pypi.org/project/DirectMultiStep/)
 
 ## Overview
 
-The preprint for this work is posted on [arXiv](https://arxiv.org/abs/2405.13983).
+This work has been published in [*J. Chem. Inf. Model*](https://pubs.acs.org/doi/10.1021/acs.jcim.4c01982). The preprint for this work was posted on [arXiv](https://arxiv.org/abs/2405.13983).
+
+You can use DMS models without installation through our web interface at [models.batistalab.com](https://models.batistalab.com). Or, if you want, you can install the package from pypi `pip install directmultistep`. Check out [dms.batistalab.com](https://dms.batistalab.com) for full documentation.
 
 ## How to use
 
@@ -53,6 +56,25 @@ See `use-examples/generate-route.py` to see more examples with other models. Oth
 - `eval-subset.py`: Evaluate a trained model on a subset of data
 - `paper-figures.py`: Reproduce figures from the paper
 - `visualize-train-curves.py`: Plot training curves and metrics
+
+## Citing
+
+If you use DirectMultiStep in an academic project, please consider citing our publication in [*J. Chem. Inf. Model*](https://pubs.acs.org/doi/10.1021/acs.jcim.4c01982):
+
+```
+@article{directmultistep,
+author = {Shee, Yu and Morgunov, Anton and Li, Haote and Batista, Victor S.},
+title = {DirectMultiStep: Direct Route Generation for Multistep Retrosynthesis},
+journal = {Journal of Chemical Information and Modeling},
+volume = {0},
+number = {0},
+pages = {null},
+year = {0},
+doi = {10.1021/acs.jcim.4c01982},
+URL = {https://doi.org/10.1021/acs.jcim.4c01982},
+eprint = {https://doi.org/10.1021/acs.jcim.4c01982}
+}
+```
 
 ## Licenses
 
