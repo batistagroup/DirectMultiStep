@@ -1,7 +1,10 @@
 #!/bin/bash
 
 # Create necessary directories
-mkdir -p data/checkpoints data/processed data/datasets/compounds
+echo "Creating necessary directories..."
+mkdir -p data/checkpoints \
+         data/processed \
+         data/datasets/compounds \
 
 # Define URLs
 CKPT_URL="https://files.batistalab.com/DirectMultiStep/ckpts"
@@ -76,3 +79,16 @@ for target in "${!targets[@]}"; do
             ;;
     esac
 done
+
+# Download canonicalized eMols and buyables
+read -p "Do you want to download canonicalized eMols and buyables? (244 MB) [y/N]: " choice
+case "$choice" in
+    y|Y )
+        echo "Downloading canonicalized eMols and buyables..."
+        wget -O "data/datasets/compounds/compounds.zip" "https://figshare.com/ndownloader/files/53117957"
+        (cd data/datasets/compounds && unzip -o compounds.zip && rm compounds.zip)
+        ;;
+    * )
+        echo "Skipping canonicalized eMols and buyables."
+        ;;
+esac

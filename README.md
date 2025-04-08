@@ -61,7 +61,7 @@ See `use-examples/generate-route.py` to see more examples with other models. Oth
 
 If you use DirectMultiStep in an academic project, please consider citing our publication in [*J. Chem. Inf. Model*](https://pubs.acs.org/doi/10.1021/acs.jcim.4c01982):
 
-```
+```tex
 @article{directmultistep,
 author = {Shee, Yu and Morgunov, Anton and Li, Haote and Batista, Victor S.},
 title = {DirectMultiStep: Direct Route Generation for Multistep Retrosynthesis},
@@ -75,6 +75,23 @@ URL = {https://doi.org/10.1021/acs.jcim.4c01982},
 eprint = {https://doi.org/10.1021/acs.jcim.4c01982}
 }
 ```
+
+## Extra Materials
+
+Through [download_files.sh](./download_files.sh) you can download canonicalized versions of eMols (23M SMILES) and Buyables (329k SMILES). Using pre-canonicalized version saves you roughly a day of cpu time. If you happen to use these canonicalized versions, consider citing the repo from figshare:
+
+```tex
+@article{Shee2025,
+author = "Yu Shee and Anton Morgunov",
+title = "{Data for "DirectMultiStep: Direct Route Generation for Multistep Retrosynthesis"}",
+year = "2025",
+month = "3",
+url = "https://figshare.com/articles/dataset/Data_for_DirectMultiStep_Direct_Route_Generation_for_Multistep_Retrosynthesis_/28629470",
+doi = "10.6084/m9.figshare.28629470.v1"
+}
+```
+
+Also check out the [HigherLev Retro](https://github.com/jihye-roh/higherlev_retro) repo which is the source of the Buyables stock set.
 
 ## Licenses
 
