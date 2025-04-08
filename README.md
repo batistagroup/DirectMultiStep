@@ -81,13 +81,15 @@ eprint = {https://doi.org/10.1021/acs.jcim.4c01982}
 Through [download_files.sh](./download_files.sh) you can download canonicalized versions of eMols (23M SMILES) and Buyables (329k SMILES). Using pre-canonicalized version saves you roughly a day of cpu time. If you happen to use these canonicalized versions, consider citing the repo from figshare:
 
 ```tex
-@article{Shee2025,
-author = "Yu Shee and Anton Morgunov",
-title = "{Data for DirectMultiStep: Direct Route Generation for Multistep Retrosynthesis}",
-year = "2025",
-month = "3",
-url = "https://figshare.com/articles/dataset/Data_for_DirectMultiStep_Direct_Route_Generation_for_Multistep_Retrosynthesis_/28629470",
-doi = "10.6084/m9.figshare.28629470.v1"
+@dataset{Shee2024,
+author = {Shee, Yu and Morgunov, Anton},
+title = {Data for DirectMultiStep: Direct Route Generation for Multistep Retrosynthesis},
+year = {2024},
+month = {3},
+publisher = {figshare},
+version = {1},
+doi = {10.6084/m9.figshare.28629470.v1},
+url = {https://figshare.com/articles/dataset/Data_for_DirectMultiStep_Direct_Route_Generation_for_Multistep_Retrosynthesis_/28629470}
 }
 ```
 
