@@ -1,7 +1,10 @@
 #!/bin/bash
 
 # Create necessary directories
-mkdir -p data/checkpoints data/processed data/datasets/compounds
+echo "Creating necessary directories..."
+mkdir -p data/checkpoints \
+         data/processed \
+         data/datasets/compounds \
 
 # Define URLs
 CKPT_URL="https://files.batistalab.com/DirectMultiStep/ckpts"
@@ -56,23 +59,16 @@ case "$choice" in
         echo "Skipping preprocessed datasets."
         ;;
 esac
-# Target datasets configurations
-declare -A targets
-targets=(
-    ["USPTO 190 targets"]="uspto_190.txt|12"
-    ["ChemBL 5000"]="chembl_targets.json|248"
-)
 
-# Download target datasets
-for target in "${!targets[@]}"; do
-    IFS="|" read -r filename size <<< "${targets[$target]}"
-    read -p "Do you want to download ${target}? (${size} KB) [y/N]: " choice
-    case "$choice" in
-        y|Y )
-            curl -o "data/datasets/compounds/${filename}" "${DATASET_URL}/${filename}"
-            ;;
-        * )
-            echo "Skipping ${filename}."
-            ;;
-    esac
-done
+# Download canonicalized eMols, buyables, ChEMBL-5000, and USPTO-190
+read -p "Do you want to download canonicalized eMols, buyables, and target datasets? (244 MB) [y/N]: " choice
+case "$choice" in
+    y|Y )
+        echo "Downloading canonicalized eMols, buyables, ChEMBL-5000, and USPTO-190 ..."
+        wget -O "data/compounds.zip" "https://figshare.com/ndownloader/files/53117957"
+        (cd data && unzip -o compounds.zip && rm compounds.zip)
+        ;;
+    * )
+        echo "Skipping canonicalized eMols and buyables."
+        ;;
+esac
