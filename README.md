@@ -78,7 +78,7 @@ If you use DirectMultiStep in an academic project, please consider citing our pu
 
 ## Extra Materials
 
-Through [download_files.sh](./download_files.sh) you can download canonicalized versions of eMols (23M SMILES) and Buyables (329k SMILES). Using pre-canonicalized version saves you roughly a day of cpu time. If you happen to use these canonicalized versions, consider citing the repo from figshare:
+Through [download_files.sh](./download_files.sh) you can download canonicalized versions of eMols (23M SMILES), Buyables (329k SMILES), ChEMBL-5000 (5k SMILES), and USPTO-190 (190 SMILES). Using pre-canonicalized version saves you roughly a day of cpu time. If you happen to use these canonicalized versions, consider citing the repo from figshare:
 
 ```tex
 @misc{shee2025figshare,
@@ -92,7 +92,7 @@ Through [download_files.sh](./download_files.sh) you can download canonicalized 
 }
 ```
 
-Also check out the [HigherLev Retro](https://github.com/jihye-roh/higherlev_retro) repo which is the source of the Buyables stock set.
+Also check out the [HigherLev Retro](https://github.com/jihye-roh/higherlev_retro) repo which is the source of the Buyables stock set. [route-distances](https://github.com/MolecularAI/route-distances?tab=readme-ov-file) is the source of ChEMBL-5000. [Retro*](https://github.com/binghong-ml/retro_star) is the source of the eMols stock set and USPTO-190.
 
 ## Licenses
 
