@@ -84,8 +84,8 @@ Through [download_files.sh](./download_files.sh) you can download canonicalized 
 @misc{shee2025figshare,
     author = {Yu Shee and Anton Morgunov},
     title = {Data for ``DirectMultiStep: Direct Route Generation for Multistep Retrosynthesis''},
-    year={2025},
-    month={3},
+    year = {2025},
+    month = {3},
     howpublished = {\url{https://figshare.com/articles/dataset/Data_for_DirectMultiStep_Direct_Route_Generation_for_Multistep_Retrosynthesis_/28629470}},
     doi = {"10.6084/m9.figshare.28629470.v1"},
     note = {Accessed: 20xx-xx-xx}
