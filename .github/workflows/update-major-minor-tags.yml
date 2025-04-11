@@ -1,17 +1,47 @@
-name: Update Major Minor Tags
+name: Release Management
+
 on:
-  push:
-    tags:
-      - "v[0-9]+.[0-9]+.[0-9]+"  # Only run on semantic version tags
+  release:
+    types: [published]  # Runs when a release is published
+
 
 permissions:
   contents: write
+  pull-requests: write
 
 jobs:
-  update_major_minor_tags:
+  update_version:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
         with:
-          fetch-depth: 0  # Fetch all history for all tags
-      - uses: haya14busa/action-update-semver@v1.2.1
+          fetch-depth: 0
+          ref: ${{ github.event.repository.default_branch }}
+          token: ${{ secrets.GITHUB_TOKEN }}
+          
+      - name: Get version from published release
+        id: get_version
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const release = context.payload.release;
+            if (!release) {
+              throw new Error('No release found in event payload');
+            }
+            // Extract version without 'v' prefix
+            const version = release.tag_name.replace(/^v/, '');
+            core.setOutput('version', version);
+            
+      - name: Update pyproject.toml version
+        run: |
+          VERSION="${{ steps.get_version.outputs.version }}"
+          # Use sed to update version only under [project] section
+          sed -i '/^\[project\]/,/^\[.*\]/ s/^version = .*/version = "'$VERSION'"/' pyproject.toml
+          
+      - name: Commit and push version update
+        run: |
+          git config --global user.name 'github-actions'
+          git config --global user.email 'github-actions@github.com'
+          git add pyproject.toml
+          git commit -m "chore: update version to ${{ steps.get_version.outputs.version }}"
+          git push origin ${{ github.event.repository.default_branch }}
