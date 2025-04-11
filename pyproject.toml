@@ -1,6 +1,6 @@
 [project]
 name = "directmultistep"
-version = "1.1.0"
+version = "1.1.1"
 requires-python = ">=3.11"
 dependencies = [
     "numpy==1.26.4",
@@ -67,20 +67,3 @@ ignore_errors = true
 [tool.ruff]
 line-length = 120
 
-[tool.logging]
-version = 1
-disable_existing_loggers = false
-
-[tool.logging.formatters.standard]
-format = "%(asctime)s [%(levelname)s] %(name)s: %(message)s"
-datefmt = "%Y-%m-%d %H:%M:%S"
-
-[tool.logging.handlers.console]
-class = "logging.StreamHandler"
-formatter = "standard"
-stream = "ext://sys.stdout"
-
-[tool.logging.loggers.directmultistep]
-handlers = ["console"]
-propagate = false
-level = "INFO"
