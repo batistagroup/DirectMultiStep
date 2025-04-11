@@ -1,6 +1,6 @@
 [project]
 name = "directmultistep"
-version = "1.1.1"
+version = "1.1.2"
 requires-python = ">=3.11"
 dependencies = [
     "numpy==1.26.4",
