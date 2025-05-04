@@ -1,11 +1,13 @@
 # DirectMultiStep: Direct Route Generation for Multi-Step Retrosynthesis
 
+[![Python Version](https://img.shields.io/badge/python-3.12+-blue.svg)](https://www.python.org/downloads/)
 [![Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
 [![Checked with mypy](https://www.mypy-lang.org/static/mypy_badge.svg)](https://mypy-lang.org/)
 [![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://github.com/batistagroup/DirectMultiStep/blob/main/LICENSE)
 [![arXiv](https://img.shields.io/badge/arXiv-2405.13983-b31b1b.svg)](https://arxiv.org/abs/2405.13983)
 [![image](https://img.shields.io/pypi/v/DirectMultiStep.svg)](https://pypi.org/project/DirectMultiStep/)
+[![PyPI - Downloads](https://img.shields.io/pypi/dm/directmultistep)](https://pypi.org/project/DirectMultiStep/)
 
 ## Overview
 
@@ -66,11 +68,12 @@ If you use DirectMultiStep in an academic project, please consider citing our pu
     author = {Shee, Yu and Morgunov, Anton and Li, Haote and Batista, Victor S.},
     title = {DirectMultiStep: Direct Route Generation for Multistep Retrosynthesis},
     journal = {Journal of Chemical Information and Modeling},
-    volume = {0},
-    number = {0},
-    pages = {null},
-    year = {0},
+    volume = {65},
+    number = {8},
+    pages = {3903-3914},
+    year = {2025},
     doi = {10.1021/acs.jcim.4c01982},
+    note ={PMID: 40197023},
     URL = {https://doi.org/10.1021/acs.jcim.4c01982},
     eprint = {https://doi.org/10.1021/acs.jcim.4c01982}
 }
