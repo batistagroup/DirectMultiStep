@@ -84,7 +84,6 @@ class ModelTrainer:
             strategy=self.config.dist_strategy,
             callbacks=self._setup_callbacks(),
             gradient_clip_val=self.config.gradient_clip_val,
-            gradient_clip_algorithm=self.config.gradient_clip_algorithm,
         )
 
     def _create_dataloaders(

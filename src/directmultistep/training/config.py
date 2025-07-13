@@ -39,7 +39,7 @@ class TrainingConfig:
     accelerator: str = "auto"
     matmul_precision: str = "high"
     summary_depth: int = 2
-    dist_strategy: str = "ddp_find_unused_parameters_true"
+    dist_strategy: str = "ddp"
 
     gradient_clip_val: float = 1.0
     gradient_clip_algorithm: str = "value"
@@ -51,9 +51,9 @@ class TrainingConfig:
         if self.matmul_precision not in ["high", "medium", "low"]:
             raise ValueError(f"{self.matmul_precision=} must be one of 'high', 'medium', or 'low'")
 
-        if self.dist_strategy not in ["auto", "fsdp", "ddp", "ddp_spawn", "ddp_find_unused_parameters_true"]:
+        if self.dist_strategy not in ["auto", "fsdp", "ddp", "ddp_spawn"]:
             raise ValueError(
-                f"{self.dist_strategy=} must be one of 'fsdp', 'ddp', 'ddp_spawn', or 'ddp_find_unused_parameters_true'"
+                f"{self.dist_strategy=} must be one of 'fsdp', 'ddp', or 'ddp_spawn'"
             )
 
         if self.gradient_clip_algorithm not in ["norm", "value"]:
