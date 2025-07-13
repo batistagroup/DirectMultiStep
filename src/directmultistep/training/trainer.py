@@ -1,8 +1,8 @@
 from typing import Any
 
-import lightning as L
+import pytorch_lightning as L
 import torch
-from lightning.pytorch.callbacks import ModelCheckpoint, RichModelSummary
+from pytorch_lightning.callbacks import ModelCheckpoint, ModelSummary
 from torch.utils.data import DataLoader
 
 from directmultistep import helpers
@@ -67,7 +67,7 @@ class ModelTrainer:
             every_n_epochs=self.config.checkpoint_every_n_epochs,
         )
 
-        return [checkpoint_callback, RichModelSummary(max_depth=self.config.summary_depth)]
+        return [checkpoint_callback, ModelSummary(max_depth=self.config.summary_depth)]
 
     def _create_trainer(self) -> L.Trainer:
         """Create Lightning trainer.

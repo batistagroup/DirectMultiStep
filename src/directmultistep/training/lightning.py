@@ -1,6 +1,6 @@
 from typing import Any, Callable, cast
 
-import lightning as pl
+import pytorch_lightning as pl
 import numpy as np
 import torch
 import torch.nn as nn
@@ -140,12 +140,11 @@ class LTraining(pl.LightningModule):
             loss,
             batch_size=self.batch_size,
             prog_bar=prog_bar,
-            sync_dist=True,
         )
-        self.log("processed_tokens", self.processed_tokens, sync_dist=True)
+        self.log("processed_tokens", self.processed_tokens)
         if mode == "train":
             current_lr = self.trainer.optimizers[0].param_groups[0]["lr"]
-            self.log(f"{mode}_lr", current_lr, batch_size=self.batch_size, sync_dist=True)
+            self.log(f"{mode}_lr", current_lr, batch_size=self.batch_size)
 
     def training_step(self, batch: Tensor, batch_idx: int) -> Tensor:
         """Performs a single training step.
