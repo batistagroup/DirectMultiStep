@@ -3,18 +3,18 @@ name = "directmultistep"
 version = "1.1.2"
 requires-python = ">=3.11"
 dependencies = [
-    "numpy==1.26.4",
-    "pandas==1.5.3",
-    "pdoc3==0.11.5",
-    "plotly==5.24.1",
-    "lightning==2.2.5",
-    "pyyaml==6.0.1",
-    "rdkit==2023.9.3",
-    "torch==2.3.0",
-    "torchmetrics==1.6.0",
-    "tqdm==4.67.1",
-    "svgwrite==1.4.3",
-    "svglib==1.5.1",
+    "numpy>=1.26.4",
+    "pandas>=1.5.3",
+    "pdoc3>=0.11.5",
+    "plotly>=5.24.1",
+    "lightning>=2.2.5",
+    "pyyaml>=6.0.1",
+    "rdkit>=2023.9.3",
+    "torch>=2.3.0",
+    "torchmetrics>=1.6.0",
+    "tqdm>=4.67.1",
+    "svgwrite>=1.4.3",
+    "svglib>=1.5.1",
     "tomli>=2.2.1",
 ]
 authors = [
