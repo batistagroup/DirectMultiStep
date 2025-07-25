@@ -31,6 +31,8 @@ Issues = "https://github.com/batistagroup/DirectMultiStep/issues"
 [tool.setuptools]
 package-dir = { "" = "src" }
 
+[tool.setuptools.package-data]
+"directmultistep.model.default_configs" = ["*.yaml"]
 
 [project.optional-dependencies]
 dev = [
