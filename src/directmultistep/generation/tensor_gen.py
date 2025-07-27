@@ -17,6 +17,7 @@ K: size of each attention key or value (sometimes called d_kv)
 import torch
 import torch.nn as nn
 from tqdm import tqdm
+from typing import Callable, Iterable
 
 from directmultistep.utils.logging_config import logger
 
@@ -49,7 +50,14 @@ class BeamSearchOptimized:
     def __repr__(self) -> str:
         return f"BeamSearchOptimized(beam_width={self.beam_size}, max_length={self.max_length})"
 
-    def decode(self, src_BC: Tensor, steps_B1: Tensor | None, path_start_BL: Tensor | None = None, progress_bar: bool = True) -> BeamSearchOutput:
+    def decode(
+        self,
+        src_BC: Tensor,
+        steps_B1: Tensor | None,
+        path_start_BL: Tensor | None = None,
+        progress_bar: bool = True,
+        custom_token_processor: Callable[[list[str]], str] | None = None,
+    ) -> BeamSearchOutput:
         """
         src_BC: product + one_sm (B, C)
         steps_B1: number of steps (B, 1)
@@ -84,6 +92,7 @@ class BeamSearchOptimized:
         logger.info(
             f"Generating routes with beam size {S}. The progress bar may end early if all beams find end token."
         )
+        pbar: Iterable[int]
         if progress_bar:
             pbar = tqdm(range(first_step, L - 1))
         else:
@@ -169,13 +178,19 @@ class BeamSearchOptimized:
 
         for b in range(B):
             for s in range(S):
-                output_str = ""
+                output_tokens = []
                 for L_idx in beam_idxs_BSL[b, s]:
                     if L_idx == self.start_idx:
                         continue
                     if L_idx == self.end_idx:
                         break
-                    output_str += self.idx_to_token[L_idx.item()]
+                    output_tokens.append(self.idx_to_token[L_idx.item()])
+
+                if custom_token_processor is not None:
+                    output_str = custom_token_processor(output_tokens)
+                else:
+                    output_str = "".join(output_tokens)
+
                 log_prob = beam_log_probs_BS[b, s].item()
                 outputs_BS2_nt[b].append((output_str, log_prob))
 

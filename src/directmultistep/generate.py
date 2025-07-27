@@ -33,7 +33,9 @@ def validate_model_constraints(model_name: ModelName, n_steps: int | None, start
         raise ValueError("explorer XL model does not support step count or starting material specification")
 
 
-def load_model(model_name: ModelName, ckpt_dir: Path, use_fp16: bool = False) -> torch.nn.Module:
+def load_published_model(
+    model_name: ModelName, ckpt_dir: Path, use_fp16: bool = False, force_device: str | None = None
+) -> torch.nn.Module:
     """Load a model by name from the available checkpoints.
 
     Args:
@@ -45,7 +47,7 @@ def load_model(model_name: ModelName, ckpt_dir: Path, use_fp16: bool = False) ->
         raise ValueError(f"Unknown model name: {model_name}. Available models: {list(MODEL_CHECKPOINTS.keys())}")
 
     preset_name, ckpt_file = MODEL_CHECKPOINTS[model_name]
-    device = ModelFactory.determine_device()
+    device = ModelFactory.determine_device(force_device)
     model = ModelFactory.from_preset(preset_name, compile_model=False).create_model()
     model = ModelFactory.load_checkpoint(model, ckpt_dir / ckpt_file, device)
 
@@ -151,7 +153,7 @@ def generate_routes(
         if ckpt_dir is None:
             raise ValueError("ckpt_dir must be provided when model is specified by name")
         validate_model_constraints(model, n_steps, starting_material)
-        model = load_model(model, ckpt_dir, use_fp16)
+        model = load_published_model(model, ckpt_dir, use_fp16)
 
     rds = RoutesProcessing(metadata_path=config_path)
     product_max_length, sm_max_length, beam_obj = create_beam_search(model, beam_size, config_path)
