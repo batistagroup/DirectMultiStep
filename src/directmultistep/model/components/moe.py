@@ -191,7 +191,7 @@ class SparseMoE(nn.Module):
             dropout: The dropout rate.
             capacity_factor: The capacity factor for each expert.
         """
-        super(SparseMoE, self).__init__()
+        super().__init__()
         self.router = NoisyTopkRouter(hid_dim, n_experts, top_k)
         self.experts = nn.ModuleList([Expert(hid_dim, ff_mult, ff_activation, dropout) for _ in range(n_experts)])
         self.n_experts = n_experts
@@ -222,11 +222,7 @@ class SparseMoE(nn.Module):
             expert_mask_BL = (indices_BLK == i).any(dim=-1)
             flat_mask_F = expert_mask_BL.view(-1)
             selected_idxs_F = torch.nonzero(flat_mask_F).squeeze(-1)
-
-            if selected_idxs_F.numel() > capacity:
-                limited_idxs_F = selected_idxs_F[:capacity]
-            else:
-                limited_idxs_F = selected_idxs_F
+            limited_idxs_F = selected_idxs_F[:capacity] if selected_idxs_F.numel() > capacity else selected_idxs_F
 
             if limited_idxs_F.numel() > 0:
                 expert_input_SD = flat_x_FD[limited_idxs_F]  # S = sum(flat_mask_F)

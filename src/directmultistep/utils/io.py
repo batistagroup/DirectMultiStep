@@ -93,7 +93,9 @@ def convert_dict_of_lists_to_list_of_dicts(dict_of_lists: DatasetDict) -> list[d
     Returns:
         A list of dictionaries.
     """
-    return [dict(zip(dict_of_lists.keys(), values)) for values in zip(*dict_of_lists.values())]
+    return [
+        dict(zip(dict_of_lists.keys(), values, strict=False)) for values in zip(*dict_of_lists.values(), strict=False)
+    ]
 
 
 def convert_list_of_dicts_to_dict_of_lists(list_of_dicts: list[dict[str, str]]) -> dict[str, list[str]]:
@@ -105,7 +107,7 @@ def convert_list_of_dicts_to_dict_of_lists(list_of_dicts: list[dict[str, str]]) 
     Returns:
         A dictionary of lists.
     """
-    return {key: [item[key] for item in list_of_dicts] for key in list_of_dicts[0].keys()}
+    return {key: [item[key] for item in list_of_dicts] for key in list_of_dicts[0]}
 
 
 def load_pharma_compounds(
@@ -121,7 +123,7 @@ def load_pharma_compounds(
     Returns:
         A dictionary containing the loaded dataset.
     """
-    with open(path_to_json, "r") as file:
+    with open(path_to_json) as file:
         data = json.load(file)
     _products, _sms, _path_strings, _steps_list = [], [], [], []
     name_idx: dict[str, list[int]] = {}
@@ -170,7 +172,7 @@ def load_commercial_stock(path: Path) -> set[str]:
     Returns:
         A set of canonicalized SMILES strings.
     """
-    with open(path, "r") as file:
+    with open(path) as file:
         stock = file.readlines()
     canonical_stock = set()
     for molecule in stock:

@@ -88,9 +88,9 @@ class ModelFactory:
             The configured Seq2Seq model.
         """
         # Create encoder based on configuration type
-        if not isinstance(self.config.encoder, (EncoderAConfig, MoEEncoderConfig)):
+        if not isinstance(self.config.encoder, EncoderAConfig | MoEEncoderConfig):
             raise TypeError("Encoder config must be either EncoderAConfig or MoEEncoderConfig")
-        if not isinstance(self.config.decoder, (TransformerConfig, MoEDecoderConfig)):
+        if not isinstance(self.config.decoder, TransformerConfig | MoEDecoderConfig):
             raise TypeError("Decoder config must be either TransformerConfig or MoEDecoderConfig")
 
         encoder: Encoder | MoEEncoder
@@ -208,10 +208,10 @@ class ModelFactory:
         try:
             with resources.path("directmultistep.model.default_configs", f"{preset_name}.yaml") as config_path:
                 return cls.from_config_file(config_path, device, compile_model)
-        except FileNotFoundError:
+        except FileNotFoundError as e:
             raise ValueError(
                 f"Preset '{preset_name}' not found. Available presets: deep_40M, explorer_xl_50M, flash_10M, flash_20M, flex_20M, wide_40M"
-            )
+            ) from e
 
     @staticmethod
     def load_checkpoint(model: Seq2Seq, ckpt_path: Path, device: torch.device) -> Seq2Seq:

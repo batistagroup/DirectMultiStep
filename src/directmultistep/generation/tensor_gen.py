@@ -14,10 +14,11 @@ H: number of attention heads in a layer
 K: size of each attention key or value (sometimes called d_kv)
 """
 
+from collections.abc import Callable, Iterable
+
 import torch
 import torch.nn as nn
 from tqdm import tqdm
-from typing import Callable, Iterable
 
 from directmultistep.utils.logging_config import logger
 
@@ -92,11 +93,7 @@ class BeamSearchOptimized:
         logger.info(
             f"Generating routes with beam size {S}. The progress bar may end early if all beams find end token."
         )
-        pbar: Iterable[int]
-        if progress_bar:
-            pbar = tqdm(range(first_step, L - 1))
-        else:
-            pbar = range(first_step, L - 1)
+        pbar: Iterable[int] = tqdm(range(first_step, L - 1)) if progress_bar else range(first_step, L - 1)
         for step in pbar:
             with torch.no_grad():
                 output_WLV = self.model.decoder(
@@ -186,10 +183,7 @@ class BeamSearchOptimized:
                         break
                     output_tokens.append(self.idx_to_token[L_idx.item()])
 
-                if token_processor is not None:
-                    output_str = token_processor(output_tokens)
-                else:
-                    output_str = "".join(output_tokens)
+                output_str = token_processor(output_tokens) if token_processor is not None else "".join(output_tokens)
 
                 log_prob = beam_log_probs_BS[b, s].item()
                 outputs_BS2_nt[b].append((output_str, log_prob))

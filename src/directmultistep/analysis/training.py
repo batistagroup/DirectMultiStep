@@ -14,10 +14,7 @@ def load_training_df(train_path: Path, run_name: str, ignore_ids: list[int] | No
     dfs = []
     versions = [log.name for log in log_path.glob("version_*")]
     logger.debug(f"Found versions: {versions} for {run_name}")
-    if ignore_ids is not None:
-        ignored_folders = {f"version_{i}" for i in ignore_ids}
-    else:
-        ignored_folders = set()
+    ignored_folders = {f"version_{i}" for i in ignore_ids} if ignore_ids is not None else set()
     for version in sorted(versions, key=lambda x: int(x.split("_")[1])):
         if version in ignored_folders:
             continue

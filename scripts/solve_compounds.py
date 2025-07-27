@@ -42,10 +42,10 @@ if __name__ == "__main__":
 
     logger.info("Loading targets and stock compounds")
     if target_name == "uspto_190":
-        with open(COMPOUND_PATH / "uspto_190.txt", "r") as f:
+        with open(COMPOUND_PATH / "uspto_190.txt") as f:
             targets = f.read().splitlines()
     elif target_name == "chembl":
-        with open(COMPOUND_PATH / "chembl_targets.json", "r") as f:
+        with open(COMPOUND_PATH / "chembl_targets.json") as f:
             targets = json.load(f)
     else:
         logger.error(f"{target_name} is not a valid target name")
@@ -53,11 +53,11 @@ if __name__ == "__main__":
 
     # eMols is available at https://github.com/binghong-ml/retro_star
     # make sure to canonicalize the SMILES strings before using them
-    with open(COMPOUND_PATH / "eMolecules.txt", "r") as f:
+    with open(COMPOUND_PATH / "eMolecules.txt") as f:
         emol_stock_set = set(f.read().splitlines())
     # buyables-stock is available at https://github.com/jihye-roh/higherlev_retro
     # make sure to canonicalize the SMILES strings before using them
-    with open(COMPOUND_PATH / "buyables-stock.txt", "r") as f:
+    with open(COMPOUND_PATH / "buyables-stock.txt") as f:
         buyables_stock_set = set(f.read().splitlines())
 
     chunk_size = len(targets) // num_part

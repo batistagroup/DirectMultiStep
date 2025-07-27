@@ -7,9 +7,7 @@ from directmultistep.training import TrainingConfig
 __mode__ = "local"
 assert __mode__ in ["local", "cluster"]
 
-if __mode__ == "local":
-    base_path = Path(__file__).resolve().parent.parent
-elif __mode__ in ["cluster"]:
+if __mode__ == "local" or __mode__ in ["cluster"]:
     base_path = Path(__file__).resolve().parent.parent
 
 data_path = base_path / "data"

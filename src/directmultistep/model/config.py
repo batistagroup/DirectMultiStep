@@ -1,6 +1,6 @@
 from dataclasses import asdict, dataclass
 from pathlib import Path
-from typing import Literal, Type, TypeVar
+from typing import Literal, TypeVar
 
 import yaml
 
@@ -57,7 +57,7 @@ class TransformerConfig:
             yaml.dump(data, f, sort_keys=False, default_flow_style=False)
 
     @classmethod
-    def load(cls: Type[T], path: Path) -> T:
+    def load(cls: type[T], path: Path) -> T:
         """Load config from yaml file.
 
         Args:
