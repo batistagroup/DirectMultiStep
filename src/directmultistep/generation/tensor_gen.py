@@ -56,7 +56,7 @@ class BeamSearchOptimized:
         steps_B1: Tensor | None,
         path_start_BL: Tensor | None = None,
         progress_bar: bool = True,
-        custom_token_processor: Callable[[list[str]], str] | None = None,
+        token_processor: Callable[[list[str]], str] | None = None,
     ) -> BeamSearchOutput:
         """
         src_BC: product + one_sm (B, C)
@@ -186,8 +186,8 @@ class BeamSearchOptimized:
                         break
                     output_tokens.append(self.idx_to_token[L_idx.item()])
 
-                if custom_token_processor is not None:
-                    output_str = custom_token_processor(output_tokens)
+                if token_processor is not None:
+                    output_str = token_processor(output_tokens)
                 else:
                     output_str = "".join(output_tokens)
 

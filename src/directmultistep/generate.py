@@ -3,7 +3,6 @@ from typing import Literal, cast
 
 import torch
 import torch.nn as nn
-import yaml
 
 from directmultistep.generation.tensor_gen import BeamSearchOptimized as BeamSearch
 from directmultistep.model import ModelFactory
@@ -57,14 +56,9 @@ def load_published_model(
     return cast(nn.Module, model)
 
 
-def create_beam_search(model: torch.nn.Module, beam_size: int, config_path: Path) -> tuple[int, int, BeamSearch]:
+def create_beam_search(model: torch.nn.Module, beam_size: int, rds: RoutesProcessing) -> BeamSearch:
     """Create a beam search object and return product/sm max lengths and the beam search object."""
     device = next(model.parameters()).device
-    with open(config_path, "rb") as file:
-        data = yaml.safe_load(file)
-        idx_to_token = data["invdict"]
-        product_max_length = data["product_max_length"]
-        sm_max_length = data["sm_max_length"]
 
     beam = BeamSearch(
         model=model,
@@ -73,10 +67,10 @@ def create_beam_search(model: torch.nn.Module, beam_size: int, config_path: Path
         pad_idx=52,
         end_idx=22,
         max_length=1074,
-        idx_to_token=idx_to_token,
+        idx_to_token=rds.idx_to_token,
         device=device,
     )
-    return product_max_length, sm_max_length, beam
+    return beam
 
 
 def prepare_input_tensors(
@@ -156,11 +150,11 @@ def generate_routes(
         model = load_published_model(model, ckpt_dir, use_fp16)
 
     rds = RoutesProcessing(metadata_path=config_path)
-    product_max_length, sm_max_length, beam_obj = create_beam_search(model, beam_size, config_path)
+    beam_obj = create_beam_search(model, beam_size, rds)
 
     # Prepare input tensors
     encoder_inp, steps_tens, path_tens = prepare_input_tensors(
-        target, n_steps, starting_material, rds, product_max_length, sm_max_length, use_fp16
+        target, n_steps, starting_material, rds, rds.product_max_length, rds.sm_max_length, use_fp16
     )
 
     # Run beam search
