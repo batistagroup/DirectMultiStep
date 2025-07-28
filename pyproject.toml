@@ -22,6 +22,10 @@ readme = "README.md"
 Homepage = "https://github.com/batistagroup/DirectMultiStep"
 Issues = "https://github.com/batistagroup/DirectMultiStep/issues"
 
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
 [tool.setuptools]
 package-dir = { "" = "src" }
 

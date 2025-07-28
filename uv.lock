@@ -323,7 +323,7 @@ wheels = [
 [[package]]
 name = "directmultistep"
 version = "1.1.2"
-source = { virtual = "." }
+source = { editable = "." }
 dependencies = [
     { name = "lightning" },
     { name = "numpy" },
