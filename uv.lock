@@ -334,6 +334,13 @@ dependencies = [
 ]
 
 [package.optional-dependencies]
+vis = [
+    { name = "plotly" },
+    { name = "svglib" },
+    { name = "svgwrite" },
+]
+
+[package.dev-dependencies]
 dev = [
     { name = "ipykernel" },
     { name = "kaleido" },
@@ -353,42 +360,41 @@ dev = [
     { name = "types-tqdm" },
     { name = "typing-extensions" },
 ]
-vis = [
-    { name = "plotly" },
-    { name = "svglib" },
-    { name = "svgwrite" },
-]
 
 [package.metadata]
 requires-dist = [
-    { name = "ipykernel", marker = "extra == 'dev'", specifier = ">=6.29.5" },
-    { name = "kaleido", marker = "extra == 'dev'", specifier = "==0.2.1" },
     { name = "lightning", specifier = ">=2.2.5" },
-    { name = "material-plausible-plugin", marker = "extra == 'dev'", specifier = ">=0.3.0" },
-    { name = "mkdocs", marker = "extra == 'dev'", specifier = ">=1.6.1" },
-    { name = "mkdocs-material", marker = "extra == 'dev'", specifier = ">=9.5.49" },
-    { name = "mkdocstrings-python", marker = "extra == 'dev'", specifier = ">=1.12.2" },
-    { name = "mypy", marker = "extra == 'dev'", specifier = ">=1.17.0" },
-    { name = "mypy-extensions", marker = "extra == 'dev'", specifier = ">=1.0.0" },
-    { name = "nbformat", marker = "extra == 'dev'", specifier = ">=5.10.4" },
     { name = "numpy", specifier = ">=1.26.4" },
     { name = "plotly", marker = "extra == 'vis'", specifier = ">=5.24.1" },
-    { name = "pre-commit", marker = "extra == 'dev'", specifier = ">=4.0.1" },
-    { name = "pytest", marker = "extra == 'dev'", specifier = ">=8.3.4" },
     { name = "pyyaml", specifier = ">=6.0.1" },
     { name = "rdkit", specifier = ">=2023.9.3" },
-    { name = "rich", marker = "extra == 'dev'", specifier = ">=13.9.4" },
-    { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.12.5" },
     { name = "svglib", marker = "extra == 'vis'", specifier = ">=1.5.1" },
     { name = "svgwrite", marker = "extra == 'vis'", specifier = ">=1.4.3" },
     { name = "torch", specifier = ">=2.3.0" },
     { name = "tqdm", specifier = ">=4.67.1" },
-    { name = "types-pyyaml", marker = "extra == 'dev'" },
-    { name = "types-requests", marker = "extra == 'dev'" },
-    { name = "types-tqdm", marker = "extra == 'dev'" },
-    { name = "typing-extensions", marker = "extra == 'dev'", specifier = ">=4.12.2" },
 ]
-provides-extras = ["dev", "vis"]
+provides-extras = ["vis"]
+
+[package.metadata.requires-dev]
+dev = [
+    { name = "ipykernel", specifier = ">=6.29.5" },
+    { name = "kaleido", specifier = "==0.2.1" },
+    { name = "material-plausible-plugin", specifier = ">=0.3.0" },
+    { name = "mkdocs", specifier = ">=1.6.1" },
+    { name = "mkdocs-material", specifier = ">=9.5.49" },
+    { name = "mkdocstrings-python", specifier = ">=1.12.2" },
+    { name = "mypy", specifier = ">=1.17.0" },
+    { name = "mypy-extensions", specifier = ">=1.0.0" },
+    { name = "nbformat", specifier = ">=5.10.4" },
+    { name = "pre-commit", specifier = ">=4.0.1" },
+    { name = "pytest", specifier = ">=8.3.4" },
+    { name = "rich", specifier = ">=13.9.4" },
+    { name = "ruff", specifier = ">=0.12.5" },
+    { name = "types-pyyaml" },
+    { name = "types-requests" },
+    { name = "types-tqdm" },
+    { name = "typing-extensions", specifier = ">=4.12.2" },
+]
 
 [[package]]
 name = "distlib"

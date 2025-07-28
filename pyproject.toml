@@ -28,7 +28,7 @@ package-dir = { "" = "src" }
 [tool.setuptools.package-data]
 "directmultistep.model.default_configs" = ["*.yaml"]
 
-[project.optional-dependencies]
+[dependency-groups]
 dev = [
     "ipykernel>=6.29.5",
     "nbformat>=5.10.4",
@@ -48,6 +48,8 @@ dev = [
     "types-tqdm",
     "types-requests",
 ]
+
+[project.optional-dependencies]
 vis = [
 "svgwrite>=1.4.3",
     "svglib>=1.5.1",
