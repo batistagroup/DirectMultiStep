@@ -37,7 +37,7 @@ jobs:
         echo "$PWD/.venv/bin" >> $GITHUB_PATH
 
     - name: Install dependencies
-      run: uv pip install -e ".[dev]"
+      run: uv sync
 
     - name: Run ruff (linter)
       run: ruff check
