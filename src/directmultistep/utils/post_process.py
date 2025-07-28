@@ -103,9 +103,9 @@ def find_matching_paths(
     match_accuracy_N: MatchList = []
     perm_match_accuracy_N: MatchList = []
     iterator = (
-        tqdm(enumerate(zip(paths_NS2n, correct_paths, strict=False)), total=len(paths_NS2n))
+        tqdm(enumerate(zip(paths_NS2n, correct_paths, strict=True)), total=len(paths_NS2n))
         if SHOW_PROGRESS_BARS
-        else enumerate(zip(paths_NS2n, correct_paths, strict=False))
+        else enumerate(zip(paths_NS2n, correct_paths, strict=True))
     )
     for i, (pathreac_S2n, correct_path) in cast(Iterator[tuple[int, tuple[BeamProcessedType, str]]], iterator):
         if i in ignore_ids:
@@ -472,7 +472,7 @@ def calculate_top_k_counts_by_step_length(
     """
     step_stats: dict[int, dict[str, int]] = {}
 
-    for rank, n_steps in zip(match_accuracy, n_steps_list, strict=False):
+    for rank, n_steps in zip(match_accuracy, n_steps_list, strict=True):
         if n_steps not in step_stats:
             step_stats[n_steps] = {"Total": 0}
 

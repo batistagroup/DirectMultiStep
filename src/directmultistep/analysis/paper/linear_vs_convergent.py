@@ -330,7 +330,7 @@ class RouteAnalyzer:
 
         colors = style.colors_blue + style.colors_purple + style.colors_red
 
-        for cat, pos in zip(categories, positions, strict=False):
+        for cat, pos in zip(categories, positions, strict=True):
             x = list(results[0][cat].keys())
             x.sort(key=lambda k: int(k.split()[-1]))
             
@@ -338,7 +338,7 @@ class RouteAnalyzer:
                 k_vals_str = [f"Top {k}" for k in k_vals]
                 x = [k for k in x if k in k_vals_str]
             
-            for i, (result, name) in enumerate(zip(results, trace_names, strict=False)):
+            for i, (result, name) in enumerate(zip(results, trace_names, strict=True)):
                 y = [float(result[cat][k].strip('%')) for k in x]
                 
                 fig.add_trace(
@@ -408,7 +408,7 @@ class RouteAnalyzer:
         cset = style.publication_colors
         colors = [cset["primary_blue"], cset["dark_blue"], cset["purple"], cset["dark_purple"]]
 
-        for i, (path, dataset, config) in enumerate(zip(result_paths, datasets, configs, strict=False)):
+        for i, (path, dataset, config) in enumerate(zip(result_paths, datasets, configs, strict=True)):
             paths_name = config.processed_paths_name
 
             with open(path / paths_name, "rb") as f:
@@ -469,7 +469,7 @@ class RouteAnalyzer:
         cset = style.publication_colors
         colors = [cset["primary_blue"], cset["dark_blue"], cset["purple"], cset["dark_purple"]]
 
-        for i, (path, dataset, config) in enumerate(zip(result_paths, datasets, configs, strict=False)):
+        for i, (path, dataset, config) in enumerate(zip(result_paths, datasets, configs, strict=True)):
             paths_name = config.processed_paths_name
 
             with open(path / paths_name, "rb") as f:

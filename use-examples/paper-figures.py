@@ -155,7 +155,7 @@ if __name__ == "__main__":
 
             result_paths = []
             trace_names = []
-            for config, dataset in zip(configs, datasets, strict=False):
+            for config, dataset in zip(configs, datasets, strict=True):
                 paths, names = process_model_configs(eval_path, [config], dataset)
                 result_paths.extend(paths)
                 trace_names.extend(names)

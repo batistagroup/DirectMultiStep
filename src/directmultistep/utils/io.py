@@ -94,7 +94,7 @@ def convert_dict_of_lists_to_list_of_dicts(dict_of_lists: DatasetDict) -> list[d
         A list of dictionaries.
     """
     return [
-        dict(zip(dict_of_lists.keys(), values, strict=False)) for values in zip(*dict_of_lists.values(), strict=False)
+        dict(zip(dict_of_lists.keys(), values, strict=True)) for values in zip(*dict_of_lists.values(), strict=True)
     ]
 
 
