@@ -1,9 +1,9 @@
-name: Code Quality
+name: Linting
 
 on: [push, pull_request]
 
 jobs:
-  qualitycheck:
+  lint:
     runs-on: ubuntu-latest
 
     steps:
@@ -45,11 +45,5 @@ jobs:
     - name: Run ruff (formatter)
       run: ruff format --check
 
-    - name: Run isort
-      run: isort --check --profile black .
-
     - name: Run mypy
       run: mypy .
-
-    - name: Run tests
-      run: pytest -v
