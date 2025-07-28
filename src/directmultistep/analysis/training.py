@@ -1,35 +1,58 @@
+import csv
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Any
 
-import pandas as pd
 import plotly.graph_objects as go
 
 from directmultistep.analysis import style
 from directmultistep.utils.logging_config import logger
 
 
-def load_training_df(train_path: Path, run_name: str, ignore_ids: list[int] | None = None) -> pd.DataFrame:
-    logger.debug(f"Loading {run_name=}")
+def _cast_numeric_values(data: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """attempts to cognize string values into floats. fails silently."""
+    # these are the columns we expect to be numeric afaict from the original code
+    numeric_cols = {"step", "train_loss", "val_loss", "epoch", "processed_tokens", "train_lr"}
+    for row in data:
+        for key, value in row.items():
+            if key in numeric_cols and value:
+                try:
+                    row[key] = float(value)
+                except (ValueError, TypeError):
+                    row[key] = None  # nullify if conversion fails
+            elif not value:
+                row[key] = None  # treat empty strings as null
+    return data
+
+
+def load_training_data(
+    train_path: Path, run_name: str, ignore_ids: list[int] | None = None
+) -> list[dict[str, float | None]]:
+    """loads data, but returns a list of dicts, not a... DataFrame."""
+    logger.debug(f"loading {run_name=}")
     log_path = train_path / run_name / "lightning_logs"
-    dfs = []
-    versions = [log.name for log in log_path.glob("version_*")]
-    logger.debug(f"Found versions: {versions} for {run_name}")
-    ignored_folders = {f"version_{i}" for i in ignore_ids} if ignore_ids is not None else set()
-    for version in sorted(versions, key=lambda x: int(x.split("_")[1])):
-        if version in ignored_folders:
+    all_rows = []
+    versions = sorted([p for p in log_path.glob("version_*") if p.is_dir()], key=lambda x: int(x.name.split("_")[1]))
+    logger.debug(f"found versions: {[v.name for v in versions]} for {run_name}")
+    ignored_folders = {f"version_{i}" for i in ignore_ids or []}
+
+    for version_path in versions:
+        if version_path.name in ignored_folders:
             continue
-        temp_df = pd.read_csv(log_path / version / "metrics.csv")
-        logger.debug(f"Loaded df with shape {temp_df.shape}")
-        dfs.append(temp_df)
-    df = pd.concat(dfs)
-    df = df.reset_index(drop=True)
-    return df
+        metrics_file = version_path / "metrics.csv"
+        if not metrics_file.exists():
+            continue
+        with open(metrics_file, encoding="utf-8") as f:
+            reader = csv.DictReader(f)
+            all_rows.extend(list(reader))
+
+    return _cast_numeric_values(all_rows)
 
 
-def create_train_trace(df: pd.DataFrame, run_name: str, color: str, x_axis: str) -> go.Scatter:
+def create_train_trace(data: list[dict[str, float | None]], run_name: str, color: str, x_axis: str) -> go.Scatter:
     return go.Scatter(
-        x=df[x_axis],
-        y=df["train_loss"],
+        x=[r[x_axis] for r in data if r.get(x_axis) is not None],
+        y=[r["train_loss"] for r in data if r.get("train_loss") is not None],
         mode="lines",
         name=f"train_loss {run_name}",
         line_color=color,
@@ -38,11 +61,11 @@ def create_train_trace(df: pd.DataFrame, run_name: str, color: str, x_axis: str)
     )
 
 
-def create_val_trace(df: pd.DataFrame, run_name: str, color: str, x_axis: str) -> go.Scatter:
-    val_df = df.dropna(subset=["val_loss"])
+def create_val_trace(data: list[dict[str, float | None]], run_name: str, color: str, x_axis: str) -> go.Scatter:
+    val_data = [r for r in data if r.get("val_loss") is not None]
     return go.Scatter(
-        x=val_df[x_axis],
-        y=val_df["val_loss"],
+        x=[r[x_axis] for r in val_data],
+        y=[r["val_loss"] for r in val_data],
         mode="lines+markers",
         name=f"val_loss {run_name}",
         line_color=color,
@@ -51,7 +74,7 @@ def create_val_trace(df: pd.DataFrame, run_name: str, color: str, x_axis: str) -
         + "epoch=%{customdata}<br>"
         + f"{x_axis}=%{{x}}<br>"
         + "val_loss=%{y}<extra></extra>",
-        customdata=val_df["epoch"],
+        customdata=[r.get("epoch") for r in val_data],
     )
 
 
@@ -69,46 +92,39 @@ def plot_training_curves(
     train_path: Path,
     runs: list[RunConfig],
     x_axis: str = "processed_tokens",
+    log_x: bool = False,
+    log_y: bool = False,
 ) -> go.Figure:
-    """Create a figure showing training and validation curves for multiple runs.
-
-    Args:
-        train_path: Path to training data directory
-        runs: List of run configurations specifying what and how to plot
-        x_axis: Column to use for x-axis values ("processed_tokens", "epoch", or "step")
-
-    Returns:
-        Plotly figure with training and validation curves
-    """
+    """makes a graph. you get it."""
     traces = []
     for i, run in enumerate(runs):
-        df = load_training_df(train_path, run.run_name, run.ignore_ids)
+        data = load_training_data(train_path, run.run_name, run.ignore_ids)
+        if not data:
+            logger.debug(f"no data found for {run.run_name}, skipping.")
+            continue
+
         color_idx = i % len(style.colors_light)
-        traces.append(
-            create_train_trace(df, run.trace_name, style.colors_light[color_idx % len(style.colors_light)], x_axis)
-        )
+        traces.append(create_train_trace(data, run.trace_name, style.colors_light[color_idx], x_axis))
         if run.include_val:
-            traces.append(
-                create_val_trace(df, run.trace_name, style.colors_dark[color_idx % len(style.colors_dark)], x_axis)
-            )
+            traces.append(create_val_trace(data, run.trace_name, style.colors_dark[color_idx], x_axis))
 
     fig = go.Figure(data=traces)
-
     fig.update_layout(
         title="Training Loss",
         xaxis_title=x_axis,
         yaxis_title="Loss",
-        width=1000,
+        xaxis_type="log" if log_x else "linear",
+        yaxis_type="log" if log_y else "linear",
     )
     style.apply_development_style(fig)
-
     return fig
 
 
-def get_lr_trace(df: pd.DataFrame, run_name: str) -> go.Scatter:
+def get_lr_trace(data: list[dict[str, float | None]], run_name: str) -> go.Scatter:
+    lr_data = [r for r in data if r.get("train_lr") is not None and r.get("step") is not None]
     return go.Scatter(
-        x=df["step"],
-        y=df["train_lr"],
+        x=[r["step"] for r in lr_data],
+        y=[r["train_lr"] for r in lr_data],
         mode="lines",
         name=f"learning rate {run_name}",
         showlegend=True,
@@ -116,49 +132,24 @@ def get_lr_trace(df: pd.DataFrame, run_name: str) -> go.Scatter:
     )
 
 
-def plot_learning_rates(
-    train_path: Path,
-    runs: list[RunConfig],
-) -> go.Figure:
-    """Create a figure showing learning rate curves for multiple runs.
-
-    Args:
-        train_path: Path to training data directory
-        runs: List of run configurations specifying what and how to plot
-
-    Returns:
-        Plotly figure with learning rate curves
-    """
+def plot_learning_rates(train_path: Path, runs: list[RunConfig]) -> go.Figure:
+    """makes another graph. also obvious."""
     traces = []
     for run in runs:
-        df = load_training_df(train_path, run.run_name, run.ignore_ids)
-        traces.append(get_lr_trace(df, run.trace_name))
+        data = load_training_data(train_path, run.run_name, run.ignore_ids)
+        if data:
+            traces.append(get_lr_trace(data, run.trace_name))
 
     fig = go.Figure(data=traces)
-
-    fig.update_layout(
-        title="Learning Rate",
-        xaxis_title="Step",
-        yaxis_title="Learning Rate",
-        width=800,
-    )
+    fig.update_layout(title="Learning Rate", xaxis_title="Step", yaxis_title="Learning Rate", width=800)
     style.apply_development_style(fig)
-
     return fig
 
 
 if __name__ == "__main__":
     train_path = Path("data/training")
 
-    runs = [
-        RunConfig(run_name="baseline_run", trace_name="Baseline Model"),
-        RunConfig(run_name="improved_run", trace_name="Improved Model", include_val=True),
-        RunConfig(
-            run_name="experimental_run",
-            trace_name="Experimental Model",
-            include_val=False,  # Only show training curve
-        ),
-    ]
+    runs = [RunConfig(run_name="sm_6x3_6x3_256_noboth_unique", trace_name="sm 6x3 6x3 256 noboth unique")]
 
-    fig = plot_training_curves(train_path, runs)
+    fig = plot_training_curves(train_path, runs, log_x=False, log_y=True)
     fig.show()
