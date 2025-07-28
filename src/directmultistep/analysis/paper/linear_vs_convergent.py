@@ -330,7 +330,7 @@ class RouteAnalyzer:
 
         colors = style.colors_blue + style.colors_purple + style.colors_red
 
-        for cat, pos in zip(categories, positions):
+        for cat, pos in zip(categories, positions, strict=True):
             x = list(results[0][cat].keys())
             x.sort(key=lambda k: int(k.split()[-1]))
             
@@ -338,7 +338,7 @@ class RouteAnalyzer:
                 k_vals_str = [f"Top {k}" for k in k_vals]
                 x = [k for k in x if k in k_vals_str]
             
-            for i, (result, name) in enumerate(zip(results, trace_names)):
+            for i, (result, name) in enumerate(zip(results, trace_names, strict=True)):
                 y = [float(result[cat][k].strip('%')) for k in x]
                 
                 fig.add_trace(
@@ -408,7 +408,7 @@ class RouteAnalyzer:
         cset = style.publication_colors
         colors = [cset["primary_blue"], cset["dark_blue"], cset["purple"], cset["dark_purple"]]
 
-        for i, (path, dataset, config) in enumerate(zip(result_paths, datasets, configs)):
+        for i, (path, dataset, config) in enumerate(zip(result_paths, datasets, configs, strict=True)):
             paths_name = config.processed_paths_name
 
             with open(path / paths_name, "rb") as f:
@@ -469,7 +469,7 @@ class RouteAnalyzer:
         cset = style.publication_colors
         colors = [cset["primary_blue"], cset["dark_blue"], cset["purple"], cset["dark_purple"]]
 
-        for i, (path, dataset, config) in enumerate(zip(result_paths, datasets, configs)):
+        for i, (path, dataset, config) in enumerate(zip(result_paths, datasets, configs, strict=True)):
             paths_name = config.processed_paths_name
 
             with open(path / paths_name, "rb") as f:
@@ -482,7 +482,7 @@ class RouteAnalyzer:
                 "non_convergent": (analyzer.convergent_idxs, 3),
             }
 
-            for route_type, (ignore_ids, row) in route_types.items():
+            for _route_type, (ignore_ids, row) in route_types.items():
                 lengths, step_stats = RouteAnalyzer._calculate_accuracy_by_length_data(
                     predicted_routes, dataset, k_vals, ignore_ids=ignore_ids
                 )
@@ -552,7 +552,7 @@ class RouteAnalyzer:
         # Create subplot titles
         def create_subtitle(stage: str, predictions: list[int]) -> str:
             mean, median, mean_f, median_f = calculate_prediction_stats(predictions)
-            base = f"{stage}<br><span style=\"font-size:{FONT_SIZES['subplot_title']-4}px\">"
+            base = f'{stage}<br><span style="font-size:{FONT_SIZES["subplot_title"] - 4}px">'
             stats = f"mean={mean:.1f}, median={median:.1f}"
             if show_filtered_stats:
                 stats += f" (μ*={mean_f:.1f}, m*={median_f:.1f})"

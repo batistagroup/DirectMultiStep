@@ -191,7 +191,7 @@ class BeamSearch:
             top_k_BS_nt.append(sorted_idx_top_S.tolist())
         for B_idx in range(B):
             for S_idx in range(S):
-                beam_idxs_BS1_nt[B_idx][S_idx].append((chosen_idx := top_k_BS_nt[B_idx][S_idx]))
+                beam_idxs_BS1_nt[B_idx][S_idx].append(chosen_idx := top_k_BS_nt[B_idx][S_idx])
                 beam_log_probs_BS_nt[B_idx][S_idx] += np.log(normalized_probs_BLS[B_idx, -1, chosen_idx].item())
 
         # Expand beam search over multiple decoding steps

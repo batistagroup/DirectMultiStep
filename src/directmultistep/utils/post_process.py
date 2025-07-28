@@ -1,4 +1,5 @@
-from typing import Iterator, cast
+from collections.abc import Iterator
+from typing import cast
 
 from tqdm import tqdm
 
@@ -102,9 +103,9 @@ def find_matching_paths(
     match_accuracy_N: MatchList = []
     perm_match_accuracy_N: MatchList = []
     iterator = (
-        tqdm(enumerate(zip(paths_NS2n, correct_paths)), total=len(paths_NS2n))
+        tqdm(enumerate(zip(paths_NS2n, correct_paths, strict=True)), total=len(paths_NS2n))
         if SHOW_PROGRESS_BARS
-        else enumerate(zip(paths_NS2n, correct_paths))
+        else enumerate(zip(paths_NS2n, correct_paths, strict=True))
     )
     for i, (pathreac_S2n, correct_path) in cast(Iterator[tuple[int, tuple[BeamProcessedType, str]]], iterator):
         if i in ignore_ids:
@@ -149,7 +150,7 @@ def find_top_n_accuracy(match_accuracy: MatchList, n_vals: list[int], dec_digs: 
         for n in n_vals:
             if rank <= n:
                 top_counts[f"Top {n}"] += 1
-    top_fractions = {k: f"{(v / len(match_accuracy)* 100):.{dec_digs}f}" for k, v in top_counts.items()}
+    top_fractions = {k: f"{(v / len(match_accuracy) * 100):.{dec_digs}f}" for k, v in top_counts.items()}
     return top_fractions
 
 
@@ -471,7 +472,7 @@ def calculate_top_k_counts_by_step_length(
     """
     step_stats: dict[int, dict[str, int]] = {}
 
-    for rank, n_steps in zip(match_accuracy, n_steps_list):
+    for rank, n_steps in zip(match_accuracy, n_steps_list, strict=True):
         if n_steps not in step_stats:
             step_stats[n_steps] = {"Total": 0}
 

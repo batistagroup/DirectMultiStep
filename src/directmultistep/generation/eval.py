@@ -65,9 +65,9 @@ class EvalConfig:
         # self._checkpoint_path: Path = files[0]
 
         allowed_ds = ["n1_50", "n1_500", "n5_50", "n5_500", "pharma"]
-        assert (
-            self.eval_dataset in allowed_ds
-        ), f"Eval dataset {self.eval_dataset} not in allowed datasets: {allowed_ds}"
+        assert self.eval_dataset in allowed_ds, (
+            f"Eval dataset {self.eval_dataset} not in allowed datasets: {allowed_ds}"
+        )
 
         b_str = f"b{self.beam_width}"
         sm_str = "sm" if self.use_sm else "nosm"
@@ -176,7 +176,7 @@ class ModelEvaluator:
         if self._beam_pickle_exists(self.save_path) and not force_rerun:
             raise FileExistsError(f"Beam search results already exist at {self.save_path / 'all_beam_results_NS2.pkl'}")
         all_beam_results_NS2: list[list[tuple[str, float]]] = []
-        for batch_idx, (prod_sm, steps, path) in tqdm(enumerate(self.dl), total=len(self.dl)):
+        for prod_sm, steps, path in tqdm(self.dl, total=len(self.dl)):
             beam_result_BS2 = self.beam.decode(
                 src_BC=prod_sm.to(self.device),
                 steps_B1=steps.to(self.device),

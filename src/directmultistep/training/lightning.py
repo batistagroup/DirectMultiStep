@@ -1,4 +1,5 @@
-from typing import Any, Callable, cast
+from collections.abc import Callable
+from typing import Any, cast
 
 import lightning as pl
 import numpy as np
@@ -193,7 +194,6 @@ class LTraining(pl.LightningModule):
                 decay_steps=self.decay_steps,
                 decay_factor=self.decay_factor,
             ),
-            verbose=False,
         )
         lr_scheduler = {
             "scheduler": scheduler,  # The LR scheduler instance (required)

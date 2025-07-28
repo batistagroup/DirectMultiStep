@@ -33,7 +33,8 @@ class PaRoutesDataset:
     def __init__(self, data_path: Path, filename: str, verbose: bool = True) -> None:
         self.data_path = data_path
         self.filename = filename
-        self.dataset = json.load(open(data_path.joinpath(filename), "r"))
+        with open(data_path.joinpath(filename)) as f:
+            self.dataset = json.load(f)
 
         self.verbose = verbose
 
@@ -94,18 +95,16 @@ class PaRoutesDataset:
                         if n_sms is not None and sm_count + 1 >= n_sms:
                             break
         print(f"Created dataset with {len(products)} entries")
-        pickle.dump(
-            (products, starting_materials, path_strings, n_steps_list),
-            open(save_path, "wb"),
-        )
+        with open(save_path, "wb") as f:
+            pickle.dump((products, starting_materials, path_strings, n_steps_list), f)
         return non_permuted_paths
 
 
 # ------- Dataset Processing -------
 print("--- Processing of the PaRoutes dataset begins!")
 print("-- starting to canonicalize n1 and n5 stocks")
-n1_stock = open(data_path / "n1-stock.txt").read().splitlines()
-n5_stock = open(data_path / "n5-stock.txt").read().splitlines()
+n1_stock = open(data_path / "n1-stock.txt").read().splitlines()  # noqa: SIM115
+n5_stock = open(data_path / "n5-stock.txt").read().splitlines()  # noqa: SIM115
 
 n1_stock_canon = [canonicalize_smiles(smi) for smi in n1_stock]
 n5_stock_canon = [canonicalize_smiles(smi) for smi in n5_stock]
@@ -128,17 +127,17 @@ n1_path_set = n1_routes_obj.prepare_final_dataset_v2(
     n_perms=n_perms,
     n_sms=n_sms,
 )
-pickle.dump(n1_path_set, open(save_path / f"n1_nperms={perm_suffix}_nsms={sm_suffix}_path_set.pkl", "wb"))
+pickle.dump(n1_path_set, open(save_path / f"n1_nperms={perm_suffix}_nsms={sm_suffix}_path_set.pkl", "wb"))  # noqa: SIM115
 
 print("-- starting to process n5 Routes")
 n5_routes_obj = PaRoutesDataset(data_path, "n5-routes.json")
 n5_path_set = n5_routes_obj.prepare_final_dataset_v2(
     save_path / f"n5_dataset_nperms={perm_suffix}_nsms={sm_suffix}.pkl", n_perms=n_perms, n_sms=n_sms
 )
-pickle.dump(n5_path_set, open(save_path / f"n5_nperms={perm_suffix}_nsms={sm_suffix}_path_set.pkl", "wb"))
+pickle.dump(n5_path_set, open(save_path / f"n5_nperms={perm_suffix}_nsms={sm_suffix}_path_set.pkl", "wb"))  # noqa: SIM115
 
-n1_path_set = pickle.load(open(save_path / "n1_nperms=all_nsms=1_path_set.pkl", "rb"))
-n5_path_set = pickle.load(open(save_path / "n5_nperms=all_nsms=1_path_set.pkl", "rb"))
+n1_path_set = pickle.load(open(save_path / "n1_nperms=all_nsms=1_path_set.pkl", "rb"))  # noqa: SIM115
+n5_path_set = pickle.load(open(save_path / "n5_nperms=all_nsms=1_path_set.pkl", "rb"))  # noqa: SIM115
 
 print("-- starting to process All Routes")
 all_routes_obj = PaRoutesDataset(data_path, "all_routes.json")
@@ -188,8 +187,8 @@ all_routes_obj.prepare_final_dataset_v2(
 
 
 def remove_sm_from_ds(load_path: Path, save_path: Path) -> None:
-    products, _, path_strings, n_steps_lists = pickle.load(open(load_path, "rb"))
-    pickle.dump((products, path_strings, n_steps_lists), open(save_path, "wb"))
+    products, _, path_strings, n_steps_lists = pickle.load(open(load_path, "rb"))  # noqa: SIM115
+    pickle.dump((products, path_strings, n_steps_lists), open(save_path, "wb"))  # noqa: SIM115
 
 
 remove_sm_from_ds(
@@ -219,5 +218,5 @@ print(f"Validation dataset size: {len(val_ds)}")
 train_ds_dict = convert_list_of_dicts_to_dict_of_lists(train_ds)
 val_ds_dict = convert_list_of_dicts_to_dict_of_lists(val_ds)
 
-save_dataset_sm(train_ds_dict, save_path / f"{train_fname.split('.')[0]}_train={1-val_frac}.pkl")
+save_dataset_sm(train_ds_dict, save_path / f"{train_fname.split('.')[0]}_train={1 - val_frac}.pkl")
 save_dataset_sm(val_ds_dict, save_path / f"{train_fname.split('.')[0]}_val={val_frac}.pkl")

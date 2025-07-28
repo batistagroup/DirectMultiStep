@@ -3,19 +3,13 @@ name = "directmultistep"
 version = "1.1.2"
 requires-python = ">=3.11"
 dependencies = [
-    "numpy==1.26.4",
-    "pandas==1.5.3",
-    "pdoc3==0.11.5",
-    "plotly==5.24.1",
-    "lightning==2.2.5",
-    "pyyaml==6.0.1",
-    "rdkit==2023.9.3",
-    "torch==2.3.0",
-    "torchmetrics==1.6.0",
-    "tqdm==4.67.1",
-    "svgwrite==1.4.3",
-    "svglib==1.5.1",
-    "tomli>=2.2.1",
+    "numpy>=1.26.4",
+    "lightning>=2.2.5",
+    "pyyaml>=6.0.1",
+    "rdkit>=2023.9.3",
+    "torch>=2.3.0",
+    "tqdm>=4.67.1",
+    
 ]
 authors = [
     { name = "Anton Morgunov", email = "anton@ischemist.com" },
@@ -28,30 +22,42 @@ readme = "README.md"
 Homepage = "https://github.com/batistagroup/DirectMultiStep"
 Issues = "https://github.com/batistagroup/DirectMultiStep/issues"
 
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
 [tool.setuptools]
 package-dir = { "" = "src" }
 
+[tool.setuptools.package-data]
+"directmultistep.model.default_configs" = ["*.yaml"]
 
-[project.optional-dependencies]
+[dependency-groups]
 dev = [
     "ipykernel>=6.29.5",
     "nbformat>=5.10.4",
     "rich>=13.9.4",
     "kaleido==0.2.1",
-    "pre-commit==4.0.1",
-    "mkdocs==1.6.1",
-    "mkdocstrings-python==1.12.2",
-    "mkdocs-material==9.5.49",
+    "pre-commit>=4.0.1",
+    "mkdocs>=1.6.1",
+    "mkdocstrings-python>=1.12.2",
+    "mkdocs-material>=9.5.49",
     "material-plausible-plugin>=0.3.0",
-    "pytest==8.3.4",
-    "ruff==0.4.7",
-    "mypy==1.13.0",
-    "isort==5.13.2",
-    "typing-extensions==4.12.2",
-    "mypy-extensions==1.0.0",
+    "pytest>=8.3.4",
+    "ruff>=0.12.5",
+    "mypy>=1.17.0",
+    "typing-extensions>=4.12.2",
+    "mypy-extensions>=1.0.0",
     "types-pyyaml",
     "types-tqdm",
     "types-requests",
+]
+
+[project.optional-dependencies]
+vis = [
+"svgwrite>=1.4.3",
+    "svglib>=1.5.1",
+    "plotly>=5.24.1",
 ]
 
 [tool.mypy]
@@ -66,4 +72,14 @@ ignore_errors = true
 
 [tool.ruff]
 line-length = 120
+lint.select = [
+    "E",   # pycodestyle
+    "F",   # Pyflakes
+    "UP",  # pyupgrade
+    "B",   # flake8-bugbear
+    "SIM", # flake8-simplify
+    "I",   # isort
+]
+lint.ignore = ["E501"] 
+
 
