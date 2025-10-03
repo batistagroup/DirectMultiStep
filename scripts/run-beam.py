@@ -67,8 +67,10 @@ def run_beam_hard() -> None:
     )
     from tqdm import tqdm
 
+    old_r_coll = []
+
     for target, sm, n_steps in tqdm(zip(targets_list, sms_list, n_steps_list, strict=False), total=len(targets_list)):
-        old_routes = generate_routes(
+        old_rs = generate_routes(
             target=target,
             n_steps=n_steps,
             starting_material=sm,
@@ -78,6 +80,7 @@ def run_beam_hard() -> None:
             ckpt_dir=Path("data/checkpoints"),
             show_progress=False,
         )
+        old_r_coll.append(old_rs)
 
     with open("b-hard-routes.txt", "w") as f:
         for i, (target, routes_for_target) in enumerate(zip(targets_list, routes, strict=False)):
@@ -85,8 +88,8 @@ def run_beam_hard() -> None:
             f.write(f"Routes: {len(routes_for_target)}\n")
             for route in routes_for_target[:3]:
                 f.write(route + "\n")
-    with open('b1-routes.txt', 'w') as f:
-        for i, (target, routes_for_target) in enumerate(zip(targets_list, old_routes, strict=False)):
+    with open("b1-routes.txt", "w") as f:
+        for i, (target, routes_for_target) in enumerate(zip(targets_list, old_r_coll, strict=False)):
             f.write(f"Target {i + 1}: {target}\n")
             f.write(f"Routes: {len(routes_for_target)}\n")
             for route in routes_for_target[:3]:
