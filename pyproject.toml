@@ -9,7 +9,7 @@ dependencies = [
     "rdkit>=2023.9.3",
     "torch>=2.3.0",
     "tqdm>=4.67.1",
-    
+
 ]
 authors = [
     { name = "Anton Morgunov", email = "anton@ischemist.com" },
@@ -80,6 +80,7 @@ lint.select = [
     "SIM", # flake8-simplify
     "I",   # isort
 ]
-lint.ignore = ["E501"] 
+lint.ignore = ["E501"]
 
-
+[tool.pytest.ini_options]
+addopts = "-m 'not ckptreq'"

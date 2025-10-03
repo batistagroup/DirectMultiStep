@@ -9,7 +9,7 @@ repos:
         entry: ruff check --fix
         language: python
         types: [python]
-        
+
       - id: ruff-format
         name: ruff (formatter)
         entry: ruff format
@@ -18,7 +18,7 @@ repos:
 
       - id: mypy
         name: mypy
-        entry: mypy
+        entry: uv run mypy
         language: system
         types: [python]
         exclude: ^(tests/)

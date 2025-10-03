@@ -16,6 +16,7 @@ from directmultistep.model.config import (
     Seq2SeqConfig,
     TransformerConfig,
 )
+from directmultistep.utils.logging_config import logger
 
 
 class ModelFactory:
@@ -167,7 +168,7 @@ class ModelFactory:
         if self.compile_model:
             model = torch.compile(model)  # type: ignore
 
-        print(f"The model has {self._count_parameters(model):,} trainable parameters")
+        logger.debug(f"The model has {self._count_parameters(model):,} trainable parameters")
         return model
 
     @classmethod

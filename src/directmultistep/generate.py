@@ -1,9 +1,11 @@
+from collections.abc import Sequence
 from pathlib import Path
 from typing import Literal, cast
 
 import torch
 import torch.nn as nn
 
+from directmultistep.generation.tensor_gen import BatchedBeamSearch
 from directmultistep.generation.tensor_gen import BeamSearchOptimized as BeamSearch
 from directmultistep.model import ModelFactory
 from directmultistep.utils.dataset import RoutesProcessing
@@ -73,6 +75,23 @@ def create_beam_search(model: torch.nn.Module, beam_size: int, rds: RoutesProces
     return beam
 
 
+def create_batched_beam_search(model: torch.nn.Module, beam_size: int, rds: RoutesProcessing) -> BatchedBeamSearch:
+    """Create a batched beam search object that supports variable batch sizes and lengths."""
+    device = next(model.parameters()).device
+
+    beam = BatchedBeamSearch(
+        model=model,
+        beam_size=beam_size,
+        start_idx=0,
+        pad_idx=52,
+        end_idx=22,
+        max_length=1074,
+        idx_to_token=rds.idx_to_token,
+        device=device,
+    )
+    return beam
+
+
 def prepare_input_tensors(
     target: str,
     n_steps: int | None,
@@ -98,11 +117,12 @@ def prepare_input_tensors(
             - steps_tens: Tensor of the number of steps, or None if not provided.
             - path_tens: Initial path tensor for the decoder.
     """
-    prod_tens = rds.smile_to_tokens(target, product_max_length)
     if starting_material:
+        prod_tens = rds.smile_to_tokens(target, product_max_length)
         sm_tens = rds.smile_to_tokens(starting_material, sm_max_length)
         encoder_inp = torch.cat([prod_tens, sm_tens], dim=0).unsqueeze(0)
     else:
+        prod_tens = rds.smile_to_tokens(target, product_max_length + sm_max_length)
         encoder_inp = torch.cat([prod_tens], dim=0).unsqueeze(0)
 
     steps_tens = torch.tensor([n_steps]).unsqueeze(0) if n_steps is not None else None
@@ -118,6 +138,67 @@ def prepare_input_tensors(
     return encoder_inp, steps_tens, path_tens
 
 
+def prepare_batched_input_tensors(
+    targets: Sequence[str],
+    n_steps_list: Sequence[int] | None,
+    starting_materials: Sequence[str | None],
+    rds: RoutesProcessing,
+    product_max_length: int,
+    sm_max_length: int,
+    use_fp16: bool = False,
+) -> tuple[torch.Tensor, torch.Tensor | None, list[torch.Tensor], list[int]]:
+    """Prepare batched input tensors for the model.
+
+    Args:
+        targets: List of SMILES strings of target molecules
+        n_steps_list: List of number of synthesis steps for each target, or None if not using steps
+        starting_materials: List of SMILES strings of starting materials (can contain None)
+        rds: RoutesProcessing object for tokenization
+        product_max_length: Maximum length of the product SMILES sequence
+        sm_max_length: Maximum length of the starting material SMILES sequence
+        use_fp16: Whether to use half precision (FP16) for tensors
+
+    Returns:
+        A tuple containing:
+            - encoder_batch: Batched input tensor for the encoder [B, C]
+            - steps_batch: Batched tensor of steps [B, 1], or None if n_steps_list is None
+            - path_starts: List of initial path tensors for decoder (variable lengths)
+            - target_lengths: List of target max lengths per batch item
+    """
+    if n_steps_list is not None and len(targets) != len(n_steps_list):
+        raise ValueError(f"Length mismatch: targets={len(targets)}, n_steps_list={len(n_steps_list)}")
+    if len(targets) != len(starting_materials):
+        raise ValueError(f"Length mismatch: targets={len(targets)}, starting_materials={len(starting_materials)}")
+
+    encoder_inputs = []
+    steps_tensors: list[torch.Tensor] = []
+    path_starts = []
+    target_lengths = []
+
+    for i, (target, sm) in enumerate(zip(targets, starting_materials, strict=False)):
+        n_steps = n_steps_list[i] if n_steps_list is not None else None
+        encoder_inp, steps_tens, path_tens = prepare_input_tensors(
+            target=target,
+            n_steps=n_steps,
+            starting_material=sm,
+            rds=rds,
+            product_max_length=product_max_length,
+            sm_max_length=sm_max_length,
+            use_fp16=use_fp16,
+        )
+
+        encoder_inputs.append(encoder_inp.squeeze(0))
+        if steps_tens is not None:
+            steps_tensors.append(steps_tens.squeeze(0))
+        path_starts.append(path_tens.squeeze(0))
+        target_lengths.append(1074)
+
+    encoder_batch = torch.stack(encoder_inputs)
+    steps_batch = torch.stack(steps_tensors) if n_steps_list is not None else None
+
+    return encoder_batch, steps_batch, path_starts, target_lengths
+
+
 def generate_routes(
     target: str,
     n_steps: int | None,
@@ -128,6 +209,7 @@ def generate_routes(
     ckpt_dir: Path | None = None,
     commercial_stock: set[str] | None = None,
     use_fp16: bool = False,
+    show_progress: bool = True,
 ) -> list[str]:
     """Generate synthesis routes using the model.
 
@@ -164,6 +246,7 @@ def generate_routes(
         src_BC=encoder_inp.to(device),
         steps_B1=steps_tens.to(device) if steps_tens is not None else None,
         path_start_BL=path_tens.to(device),
+        progress_bar=show_progress,
     )
     for beam_result_S2 in beam_result_BS2:
         all_beam_results_NS2.append(beam_result_S2)
@@ -177,3 +260,74 @@ def generate_routes(
         commercial_stock=commercial_stock,
     )
     return [beam_result[0] for beam_result in correct_paths_NS2n[0]]
+
+
+def generate_routes_batched(
+    targets: Sequence[str],
+    n_steps_list: Sequence[int] | None,
+    starting_materials: Sequence[str | None],
+    beam_size: int,
+    model: ModelName | torch.nn.Module,
+    config_path: Path,
+    ckpt_dir: Path | None = None,
+    commercial_stock: set[str] | None = None,
+    use_fp16: bool = False,
+) -> list[list[str]]:
+    """Generate synthesis routes for multiple targets using batched beam search.
+
+    Args:
+        targets: List of SMILES strings of target molecules
+        n_steps_list: List of number of synthesis steps for each target, or None if not using steps
+        starting_materials: List of starting materials for each target (can contain None)
+        beam_size: Beam size for the beam search
+        model: Either a model name or a torch.nn.Module
+        config_path: Path to the model configuration file
+        ckpt_dir: Directory containing model checkpoints (required if model is a string)
+        commercial_stock: Set of commercially available starting materials (SMILES)
+        use_fp16: Whether to use half precision (FP16) for model weights and computations
+
+    Returns:
+        List of lists, where each inner list contains valid routes for the corresponding target
+    """
+    if isinstance(model, str):
+        if ckpt_dir is None:
+            raise ValueError("ckpt_dir must be provided when model is specified by name")
+        for i, (sm, _target) in enumerate(zip(starting_materials, targets, strict=False)):
+            n_steps = n_steps_list[i] if n_steps_list is not None else None
+            validate_model_constraints(model, n_steps, sm)
+        model = load_published_model(model, ckpt_dir, use_fp16)
+
+    rds = RoutesProcessing(metadata_path=config_path)
+    beam_obj = create_batched_beam_search(model, beam_size, rds)
+
+    encoder_batch, steps_batch, path_starts, target_lengths = prepare_batched_input_tensors(
+        targets=targets,
+        n_steps_list=n_steps_list,
+        starting_materials=starting_materials,
+        rds=rds,
+        product_max_length=rds.product_max_length,
+        sm_max_length=rds.sm_max_length,
+        use_fp16=use_fp16,
+    )
+
+    device = next(model.parameters()).device
+    beam_results = beam_obj.decode(
+        src_BC=encoder_batch.to(device),
+        steps_B1=steps_batch.to(device) if steps_batch is not None else None,
+        path_starts=[ps.to(device) for ps in path_starts],
+        target_lengths=target_lengths,
+        progress_bar=True,
+    )
+
+    all_results = []
+    for idx, (target, sm) in enumerate(zip(targets, starting_materials, strict=False)):
+        valid_paths = find_valid_paths([beam_results[idx]])
+        correct_paths = process_path_single(
+            paths_NS2n=valid_paths,
+            true_products=[target],
+            true_reacs=[sm] if sm else None,
+            commercial_stock=commercial_stock,
+        )
+        all_results.append([beam_result[0] for beam_result in correct_paths[0]])
+
+    return all_results

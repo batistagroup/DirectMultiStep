@@ -50,3 +50,5 @@ debug*
 slurm*.out
 submit*.sh
 qual.sh
+
+collectors/
