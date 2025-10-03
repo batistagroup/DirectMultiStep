@@ -15,7 +15,6 @@ K: size of each attention key or value (sometimes called d_kv)
 """
 
 from collections.abc import Callable, Iterable
-from dataclasses import dataclass
 
 import torch
 import torch.nn as nn
@@ -25,13 +24,6 @@ from directmultistep.utils.logging_config import logger
 
 Tensor = torch.Tensor
 BeamSearchOutput = list[list[tuple[str, float]]]
-
-
-@dataclass
-class BeamState:
-    sequence: Tensor
-    score: float
-    active: bool
 
 
 class BatchedBeamSearch:
@@ -66,7 +58,6 @@ class BatchedBeamSearch:
         S = self.beam_size
         # Pre-compute beam indices for gather operations
         self.beam_indices = torch.arange(S, device=self.device)
-        self.beam_offsets = torch.arange(S, device=self.device).unsqueeze(-1) * S
 
     def decode(
         self,
@@ -118,17 +109,10 @@ class BatchedBeamSearch:
         first_step = int(first_steps_B.min().item())
         max_steps = L - 1 if target_lengths is None else max(target_lengths)
 
-        # Pre-allocate reusable tensors for the loop
-        # batch_indices = torch.arange(B, device=self.device).unsqueeze(1).expand(B, S)
-        # beam_expand_indices = self.beam_indices.unsqueeze(0).expand(B, -1)
-
         # Pre-allocate candidate selection tensors
         candidate_buffer = torch.zeros((B, S * S), device=self.device, dtype=dtype)
         beam_idx_buffer = torch.zeros((B, S * S), dtype=torch.long, device=self.device)
         token_idx_buffer = torch.zeros((B, S * S), dtype=torch.long, device=self.device)
-
-        # Pre-compute beam index patterns for candidate expansion
-        beam_idx_pattern = self.beam_indices.unsqueeze(1).expand(-1, S).reshape(-1)
 
         pbar: Iterable[int] = (
             tqdm(range(first_step, max_steps), desc="Beam search", dynamic_ncols=True)
@@ -164,10 +148,6 @@ class BatchedBeamSearch:
 
             # KEEP ORIGINAL: Only process active sequences
             active_mask_flat = active_mask_BS.view(B * S)
-            n_active = active_mask_flat.sum().item()
-
-            if n_active == 0:
-                continue
 
             # Get active sequence indices
             active_indices = active_mask_flat.nonzero(as_tuple=True)[0]
