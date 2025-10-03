@@ -16,6 +16,7 @@ K: size of each attention key or value (sometimes called d_kv)
 
 from collections.abc import Callable, Iterable
 from dataclasses import dataclass
+from typing import Any
 
 import torch
 import torch.nn as nn
@@ -67,194 +68,223 @@ class BatchedBeamSearch:
         progress_bar: bool = True,
         token_processor: Callable[[list[str]], str] | None = None,
     ) -> BeamSearchOutput:
+        """
+        Properly handle batched beam search where each batch item can terminate independently.
+
+        Args:
+            src_BC: Source sequences (B, C)
+            steps_B1: Number of steps per batch (B, 1)
+            path_starts: Optional starting paths for each batch item
+            target_lengths: Optional target lengths for each batch item
+            progress_bar: Whether to show progress bar
+            token_processor: Optional function to process tokens into strings
+
+        Returns:
+            List of beam results for each batch item
+        """
         B, C = src_BC.shape
         S = self.beam_size
+        L = self.max_length
 
-        if target_lengths is None:
-            target_lengths = [self.max_length] * B
-
-        if path_starts is None:
-            path_starts = [None] * B
-
+        # Encode source sequences
         src_mask_B11C = (src_BC != self.pad_idx).unsqueeze(1).unsqueeze(2)
         enc_src_BCD = self.model.encoder(src_BC.long(), src_mask_B11C, steps_B1)
 
-        beams: list[list[BeamState]] = []
-        next_positions: list[int] = []
-        finished: list[list[tuple[Tensor, float]]] = []
-        batch_item_active: list[bool] = []
-
+        # Initialize beams for each batch item
+        # Each batch item maintains S beams independently
+        batch_beams = []
         for b in range(B):
-            beam_list: list[BeamState] = []
-            target_len = target_lengths[b]
-            path_start = path_starts[b]
-
-            if path_start is not None:
-                start_len = path_start.size(0)
-                for s in range(S):
-                    seq = torch.full((target_len,), self.pad_idx, dtype=torch.long, device=self.device)
-                    seq[:start_len] = path_start
-                    score = 0.0 if s == 0 else float('-inf')
-                    beam_list.append(BeamState(sequence=seq, score=score, active=(s == 0)))
-                next_positions.append(start_len)
-            else:
-                for s in range(S):
-                    seq = torch.full((target_len,), self.pad_idx, dtype=torch.long, device=self.device)
-                    seq[0] = self.start_idx
-                    score = 0.0 if s == 0 else float('-inf')
-                    beam_list.append(BeamState(sequence=seq, score=score, active=(s == 0)))
-                next_positions.append(1)
-
-            beams.append(beam_list)
-            finished.append([])
-            batch_item_active.append(True)
-
-        max_steps = max(target_lengths)
-        pbar: Iterable[int] = tqdm(range(max_steps)) if progress_bar else range(max_steps)
-
-        for step in pbar:
-            if not any(batch_item_active):
-                break
-
-            active_batch_indices: list[int] = []
-            active_beam_indices: list[int] = []
-            active_sequences: list[Tensor] = []
-            active_enc_outputs: list[Tensor] = []
-
-            for b in range(B):
-                if not batch_item_active[b]:
-                    continue
-                for s in range(S):
-                    if beams[b][s].active:
-                        active_batch_indices.append(b)
-                        active_beam_indices.append(s)
-                        seq = beams[b][s].sequence[:next_positions[b]]
-                        active_sequences.append(seq)
-                        active_enc_outputs.append(enc_src_BCD[b])
-
-            if len(active_sequences) == 0:
-                break
-
-            max_seq_len = max(seq.size(0) for seq in active_sequences)
-            padded_sequences = torch.full(
-                (len(active_sequences), max_seq_len),
-                self.pad_idx,
-                dtype=torch.long,
-                device=self.device
-            )
-            for i, seq in enumerate(active_sequences):
-                padded_sequences[i, :seq.size(0)] = seq
-
-            active_enc_stacked = torch.stack(active_enc_outputs, dim=0)
-            active_src_mask = torch.ones(
-                len(active_sequences), 1, 1, C,
-                dtype=torch.bool,
-                device=self.device
-            )
-
-            with torch.no_grad():
-                output_NLV = self.model.decoder(
-                    trg_BL=padded_sequences,
-                    enc_src_BCD=active_enc_stacked,
-                    src_mask_B11C=active_src_mask,
-                    trg_mask_B1LL=None,
+            beams = []
+            for s in range(S):
+                beam = BeamState(
+                    sequence=torch.full((L,), self.pad_idx, dtype=torch.long, device=self.device),
+                    score=0.0 if s == 0 else float('-inf'),  # Only first beam starts with 0
+                    active=True
                 )
 
-            next_token_logits = output_NLV[:, -1, :]
-            next_token_logprobs = torch.log_softmax(next_token_logits, dim=-1)
+                # Set initial tokens
+                if path_starts and path_starts[b] is not None:
+                    path_len = path_starts[b].size(0)
+                    beam.sequence[:path_len] = path_starts[b]
+                    first_step = path_len
+                else:
+                    beam.sequence[0] = self.start_idx
+                    first_step = 1
+
+                beams.append(beam)
+            batch_beams.append(beams)
+
+        # Track which batches are completely finished
+        batch_finished = [False] * B
+
+        # Determine max steps
+        max_steps = L - 1
+        if target_lengths:
+            max_steps = max(target_lengths)
+
+        pbar: Iterable[int] = (
+            tqdm(range(first_step, max_steps), desc="Beam search", dynamic_ncols=True)
+            if progress_bar else range(first_step, max_steps)
+        )
+
+        for step in pbar:
+            if all(batch_finished):
+                break
+
+            # First, check all beams for end tokens in their sequences
+            # This ensures beams that found end token in previous steps are marked inactive
+            for b in range(B):
+                if batch_finished[b]:
+                    continue
+                all_inactive = True
+                for beam in batch_beams[b]:
+                    if beam.active:
+                        # Check if sequence already contains end token
+                        if torch.any(beam.sequence[:step] == self.end_idx):
+                            beam.active = False
+                        else:
+                            all_inactive = False
+
+                # If all beams for this batch are inactive, mark batch as finished
+                if all_inactive:
+                    batch_finished[b] = True
+
+            # Collect all active beams across batches for efficient forward pass
+            active_sequences = []
+            active_indices = []  # (batch_idx, beam_idx) pairs
 
             for b in range(B):
-                if not batch_item_active[b]:
+                if batch_finished[b]:
                     continue
 
-                candidates: list[dict] = []
+                for s, beam in enumerate(batch_beams[b]):
+                    if beam.active:
+                        active_sequences.append(beam.sequence[:step])
+                        active_indices.append((b, s))
 
-                beam_masks = [(active_batch_indices[i] == b) for i in range(len(active_batch_indices))]
-                batch_beams = [i for i, mask in enumerate(beam_masks) if mask]
+            if not active_sequences:
+                break
 
-                for idx in batch_beams:
-                    s = active_beam_indices[idx]
-                    current_score = beams[b][s].score
+            # Batch forward pass for all active beams
+            active_sequences_tensor = torch.stack(active_sequences, dim=0)
+            num_active = len(active_sequences)
 
-                    token_scores = next_token_logprobs[idx]
-                    top_k = min(S, token_scores.size(0))
-                    top_k_scores, top_k_tokens = torch.topk(token_scores, top_k)
+            # Expand encoder outputs for active beams
+            enc_expanded = []
+            src_mask_expanded = []
 
-                    for k in range(top_k):
-                        new_seq = beams[b][s].sequence.clone()
-                        new_seq[next_positions[b]] = top_k_tokens[k]
-                        new_score = current_score + top_k_scores[k].item()
+            for b, s in active_indices:
+                enc_expanded.append(enc_src_BCD[b:b+1])
+                src_mask_expanded.append(src_mask_B11C[b:b+1])
 
-                        seq_len = next_positions[b] + 1
-                        normalized_score = new_score / (seq_len ** 0.5)
+            enc_expanded = torch.cat(enc_expanded, dim=0)
+            src_mask_expanded = torch.cat(src_mask_expanded, dim=0)
 
-                        candidates.append({
-                            'sequence': new_seq,
-                            'score': new_score,
-                            'norm_score': normalized_score,
-                            'finished': (top_k_tokens[k].item() == self.end_idx)
-                        })
+            # Get predictions
+            with torch.no_grad():
+                output = self.model.decoder(
+                    trg_BL=active_sequences_tensor,
+                    enc_src_BCD=enc_expanded,
+                    src_mask_B11C=src_mask_expanded,
+                    trg_mask_B1LL=None
+                )
 
-                candidates.sort(key=lambda x: x['norm_score'], reverse=True)
+            log_probs = torch.log_softmax(output[:, -1, :], dim=-1)
 
-                finished_candidates = [c for c in candidates if c['finished']]
-                continuing_candidates = [c for c in candidates if not c['finished']]
-
-                for c in finished_candidates[:S]:
-                    finished[b].append((c['sequence'][:next_positions[b]+1].clone(), c['score']))
-
-                beam_idx = 0
-                for c in continuing_candidates[:S]:
-                    beams[b][beam_idx].sequence = c['sequence']
-                    beams[b][beam_idx].score = c['score']
-                    beams[b][beam_idx].active = True
-                    beam_idx += 1
-
-                for s in range(beam_idx, S):
-                    beams[b][s].active = False
-
-                if beam_idx == 0 or next_positions[b] >= target_lengths[b] - 1:
-                    batch_item_active[b] = False
-                    for s in range(S):
-                        if beams[b][s].active:
-                            finished[b].append(
-                                (beams[b][s].sequence[:next_positions[b]].clone(), beams[b][s].score)
-                            )
-                            beams[b][s].active = False
-
+            # Process predictions for each batch
+            active_idx = 0
             for b in range(B):
-                if batch_item_active[b]:
-                    next_positions[b] += 1
+                if batch_finished[b]:
+                    continue
 
-        results: list[list[tuple[str, float]]] = []
+                # Collect candidates for this batch
+                candidates = []
+
+                for s, beam in enumerate(batch_beams[b]):
+                    if not beam.active:
+                        # Keep finished beams as candidates with their final scores
+                        candidates.append((beam.sequence.clone(), beam.score, False))
+                        continue
+
+                    # Get log probs for this beam
+                    beam_log_probs = log_probs[active_idx]
+                    active_idx += 1
+
+                    # For first real step, only expand from first beam
+                    if step == first_step and s > 0:
+                        continue
+
+                    # Get top K tokens
+                    if step == first_step:
+                        # First step: take top S tokens
+                        k = S
+                    else:
+                        # Later steps: take top S tokens per beam
+                        k = S
+
+                    top_log_probs, top_indices = torch.topk(beam_log_probs, k=min(k, beam_log_probs.size(0)))
+
+                    # Create candidate sequences
+                    for token_log_prob, token_idx in zip(top_log_probs, top_indices):
+                        new_seq = beam.sequence.clone()
+                        new_seq[step] = token_idx
+                        new_score = beam.score + token_log_prob.item()
+
+                        # Check if sequence is finished (either new token is end or sequence already has end)
+                        is_finished = (token_idx == self.end_idx) or torch.any(new_seq[:step] == self.end_idx).item()
+
+                        candidates.append((new_seq, new_score, is_finished))
+
+                # Normalize scores by length and select top S beams
+                normalized_candidates = []
+                for seq, score, is_finished in candidates:
+                    # Calculate actual sequence length (excluding padding)
+                    seq_len = (seq != self.pad_idx).sum().float()
+                    # Normalize by square root of length (following the original implementation)
+                    normalized_score = score / (seq_len.sqrt() + 1e-6)
+                    normalized_candidates.append((seq, score, normalized_score, is_finished))
+
+                # Sort by normalized score and keep top S
+                normalized_candidates.sort(key=lambda x: x[2], reverse=True)
+                top_candidates = normalized_candidates[:S]
+
+                # Update beams for this batch
+                new_beams = []
+                for seq, score, _, is_finished in top_candidates:
+                    beam = BeamState(
+                        sequence=seq,
+                        score=score,
+                        active=not is_finished
+                    )
+                    new_beams.append(beam)
+
+                batch_beams[b] = new_beams
+
+        # Extract final results
+        outputs_BS2_nt: list[list[tuple[str, float]]] = []
 
         for b in range(B):
-            all_beams: list[tuple[Tensor, float]] = list(finished[b])
-
-            for s in range(S):
-                if beams[b][s].active:
-                    all_beams.append((beams[b][s].sequence[:next_positions[b]].clone(), beams[b][s].score))
-
-            all_beams.sort(key=lambda x: x[1], reverse=True)
-            top_beams = all_beams[:S]
-
-            batch_results: list[tuple[str, float]] = []
-            for seq_tensor, score in top_beams:
+            batch_results = []
+            for beam in batch_beams[b]:
+                # Convert sequence to tokens
                 output_tokens = []
-                for token_idx in seq_tensor:
-                    idx = token_idx.item()
+                for idx in beam.sequence:
+                    if idx == self.pad_idx:
+                        break
                     if idx == self.start_idx:
                         continue
                     if idx == self.end_idx:
                         break
-                    output_tokens.append(self.idx_to_token[idx])
+                    output_tokens.append(self.idx_to_token[idx.item()])
 
-                output_str = token_processor(output_tokens) if token_processor is not None else "".join(output_tokens)
-                batch_results.append((output_str, score))
+                # Process tokens into string
+                output_str = token_processor(output_tokens) if token_processor else "".join(output_tokens)
 
-            results.append(batch_results)
+                batch_results.append((output_str, beam.score))
 
-        return results
+            outputs_BS2_nt.append(batch_results)
+
+        return outputs_BS2_nt
 
 
 class BeamSearchOptimized:
@@ -322,7 +352,7 @@ class BeamSearchOptimized:
         logger.info(
             f"Generating routes with beam size {S}. The progress bar may end early if all beams find end token."
         )
-        pbar: Iterable[int] = tqdm(range(first_step, L - 1)) if progress_bar else range(first_step, L - 1)
+        pbar: Iterable[int] = tqdm(range(first_step, L - 1), dynamic_ncols=True) if progress_bar else range(first_step, L - 1)
         for step in pbar:
             with torch.no_grad():
                 output_WLV = self.model.decoder(

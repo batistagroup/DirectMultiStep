@@ -1,40 +1,47 @@
 from pathlib import Path
+from directmultistep import generate_routes, generate_routes_batched
 
-import numpy as np
-import pytest
-import torch
+def run_beam1():
+    target = "CNCc1ccccc1"
+    starting_material = "CN"
+    n_steps = 1
 
-from directmultistep.generation.tensor_gen import BatchedBeamSearch, BeamSearchOptimized
-from directmultistep.utils.dataset import RoutesProcessing
-from directmultistep.generate import load_published_model
-from directmultistep.generate import prepare_input_tensors
+    routes = generate_routes(
+        target=target,
+        n_steps=n_steps,
+        starting_material=starting_material,
+        beam_size=5,
+        model="flash",
+        config_path=Path("data/configs/dms_dictionary.yaml"),
+        ckpt_dir=Path("data/checkpoints"),
+    )
 
-torch.manual_seed(42)
-np.random.seed(42)
+    with open('b-1-routes.txt', 'w') as f:
+        for route in routes[:3]:
+            f.write(route + '\n')
 
-config_path = Path("data/configs/dms_dictionary.yaml")
-ckpt_dir = Path("data/checkpoints")
+def run_beam2():
+    targets = ["CNCc1ccccc1"]*2
+    starting_materials = ["CN"]*2
+    n_steps_list = [1]*2
 
-if not config_path.exists() or not ckpt_dir.exists():
-    pytest.skip("Model files not found. Ensure data is downloaded.")
+    routes = generate_routes_batched(
+        targets=targets,
+        n_steps_list=n_steps_list,
+        starting_materials=starting_materials,
+        beam_size=5,
+        model="flash",
+        config_path=Path("data/configs/dms_dictionary.yaml"),
+        ckpt_dir=Path("data/checkpoints"),
+    )
 
+    with open('b-2-routes.txt', 'w') as f:
+        for i, (target, routes_for_target) in enumerate(zip(targets, routes)):
+            f.write(f"Target {i+1}: {target}\n")
+            f.write(f"Routes: {len(routes_for_target)}\n")
+            for route in routes_for_target[:3]:
+                f.write(route + '\n')
 
-
-model = load_published_model("flash", ckpt_dir)
-rds = RoutesProcessing(metadata_path=config_path)
-
-device = next(model.parameters()).device
-beam_obj = BatchedBeamSearch(
-    model=model,
-    beam_size=5,
-    start_idx=0,
-    pad_idx=52,
-    end_idx=22,
-    max_length=1074,
-    idx_to_token=rds.idx_to_token,
-    device=device,
-)
-
-target = "CNCc1cc(-c2ccccc2F)n(S(=O)(=O)c2cccnc2)c1"
-starting_material = "CN"
-n_steps = 2
+if __name__ == "__main__":
+    run_beam1()
+    run_beam2()
