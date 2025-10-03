@@ -5,11 +5,15 @@ Tests for beam search functionality in DirectMultiStep.
 import pickle
 from pathlib import Path
 
+import numpy as np
 import pytest
 import torch
 
 from directmultistep.generate import create_beam_search, prepare_input_tensors
 from directmultistep.utils.dataset import RoutesProcessing
+
+torch.manual_seed(42)
+np.random.seed(42)
 
 
 class TestBeamSearch:
@@ -117,7 +121,6 @@ class TestBeamSearch:
 
         case_data = comprehensive_test_data[case_name]
         intermediate_data = case_data["intermediate_data"]
-        expected_paths = case_data["final_paths"]
 
         # Set seed for reproducibility
         torch.manual_seed(42)
@@ -132,18 +135,15 @@ class TestBeamSearch:
             progress_bar=False,
         )
 
-        # The beam search returns all beam results, but the final paths may be filtered
-        # So we expect the beam search to return beam_size results, but final processing may reduce this
+        # The beam search returns all beam results
         assert len(results[0]) == beam_obj.beam_size  # Should return full beam results
 
-        # Compare the top result (should be very similar)
-        if results[0] and expected_paths:
-            actual_top = results[0][0][0]  # First beam result
-            expected_top = expected_paths[0] if isinstance(expected_paths[0], str) else expected_paths[0][0]
-
-            # Allow for minor differences due to floating point precision
-            assert isinstance(actual_top, str)
-            assert len(actual_top) > 0  # Should produce some output
+        # Verify the top result is valid
+        if results[0]:
+            actual_top_seq, actual_top_logprob = results[0][0]
+            assert isinstance(actual_top_seq, str)
+            assert len(actual_top_seq) > 0  # Should produce some output
+            assert isinstance(actual_top_logprob, float)
 
     def test_beam_search_with_different_beam_sizes(self, model_components):
         """Test beam search with different beam sizes."""
@@ -245,3 +245,190 @@ class TestBeamSearch:
         # Check that log probabilities are valid
         assert not torch.isnan(log_probs).any()
         assert (log_probs <= 0).all()  # Log probabilities should be <= 0
+
+    def test_exact_sequence_reproduction(self, model_components, comprehensive_test_data):
+        """Test exact reproduction of generated sequences with fixed seed."""
+        model, rds, beam_obj = model_components
+
+        case_name = "target1"
+        if case_name not in comprehensive_test_data or comprehensive_test_data[case_name] is None:
+            pytest.skip(f"Comprehensive test data for {case_name} not available")
+
+        case_data = comprehensive_test_data[case_name]
+        intermediate_data = case_data["intermediate_data"]
+
+        # Check if raw_beam_results exists (new format)
+        if "raw_beam_results" not in case_data:
+            pytest.skip("Test data needs to be regenerated with raw_beam_results")
+
+        expected_beam_results = case_data["raw_beam_results"]
+
+        # Set seed for reproducibility
+        torch.manual_seed(42)
+        np.random.seed(42)
+
+        # Call the actual decode method
+        results = beam_obj.decode(
+            src_BC=intermediate_data["encoder_input"].to(beam_obj.device),
+            steps_B1=intermediate_data["steps_tensor"].to(beam_obj.device)
+            if intermediate_data["steps_tensor"] is not None
+            else None,
+            path_start_BL=intermediate_data["path_start_tensor"].to(beam_obj.device),
+            progress_bar=False,
+        )
+
+        # Extract sequences and log probs from results
+        actual_sequences = [path for path, _ in results[0]]
+        actual_log_probs = [log_prob for _, log_prob in results[0]]
+
+        # Extract expected sequences and log probs
+        expected_sequences = [path for path, _ in expected_beam_results[0]]
+        expected_log_probs = [log_prob for _, log_prob in expected_beam_results[0]]
+
+        # Test exact sequence reproduction
+        assert len(actual_sequences) == len(expected_sequences), (
+            f"Should generate {len(expected_sequences)} sequences, got {len(actual_sequences)}"
+        )
+
+        for i, (actual, expected) in enumerate(zip(actual_sequences, expected_sequences, strict=False)):
+            assert actual == expected, f"Beam {i}: Sequence mismatch.\nExpected: {expected}\nActual: {actual}"
+
+        # Test exact log probability reproduction
+        for i, (actual_lp, expected_lp) in enumerate(zip(actual_log_probs, expected_log_probs, strict=False)):
+            assert abs(actual_lp - expected_lp) < 1e-5, (
+                f"Beam {i}: Log prob mismatch. Expected: {expected_lp:.6f}, Actual: {actual_lp:.6f}"
+            )
+
+    def test_exact_sequence_reproduction_target2(self, model_components, comprehensive_test_data):
+        """Test exact reproduction for second target molecule."""
+        model, rds, beam_obj = model_components
+
+        case_name = "target2"
+        if case_name not in comprehensive_test_data or comprehensive_test_data[case_name] is None:
+            pytest.skip(f"Comprehensive test data for {case_name} not available")
+
+        case_data = comprehensive_test_data[case_name]
+        intermediate_data = case_data["intermediate_data"]
+
+        # Check if raw_beam_results exists (new format)
+        if "raw_beam_results" not in case_data:
+            pytest.skip("Test data needs to be regenerated with raw_beam_results")
+
+        expected_beam_results = case_data["raw_beam_results"]
+
+        # Set seed for reproducibility
+        torch.manual_seed(42)
+        np.random.seed(42)
+
+        # Call the actual decode method
+        results = beam_obj.decode(
+            src_BC=intermediate_data["encoder_input"].to(beam_obj.device),
+            steps_B1=intermediate_data["steps_tensor"].to(beam_obj.device)
+            if intermediate_data["steps_tensor"] is not None
+            else None,
+            path_start_BL=intermediate_data["path_start_tensor"].to(beam_obj.device),
+            progress_bar=False,
+        )
+
+        # Extract sequences and log probs
+        actual_sequences = [path for path, _ in results[0]]
+        actual_log_probs = [log_prob for _, log_prob in results[0]]
+        expected_sequences = [path for path, _ in expected_beam_results[0]]
+        expected_log_probs = [log_prob for _, log_prob in expected_beam_results[0]]
+
+        # Test exact sequence reproduction
+        assert len(actual_sequences) == len(expected_sequences)
+
+        for i, (actual, expected) in enumerate(zip(actual_sequences, expected_sequences, strict=False)):
+            assert actual == expected, f"Target2 Beam {i}: Sequence mismatch.\nExpected: {expected}\nActual: {actual}"
+
+        # Test exact log probability reproduction
+        for i, (actual_lp, expected_lp) in enumerate(zip(actual_log_probs, expected_log_probs, strict=False)):
+            assert abs(actual_lp - expected_lp) < 1e-5, (
+                f"Target2 Beam {i}: Log prob mismatch. Expected: {expected_lp:.6f}, Actual: {actual_lp:.6f}"
+            )
+
+    def test_top_beam_values(self, model_components, comprehensive_test_data):
+        """Test specific values for the top-ranked beam."""
+        model, rds, beam_obj = model_components
+
+        case_name = "target1"
+        if case_name not in comprehensive_test_data or comprehensive_test_data[case_name] is None:
+            pytest.skip(f"Comprehensive test data for {case_name} not available")
+
+        case_data = comprehensive_test_data[case_name]
+        intermediate_data = case_data["intermediate_data"]
+
+        # Check if raw_beam_results exists (new format)
+        if "raw_beam_results" not in case_data:
+            pytest.skip("Test data needs to be regenerated with raw_beam_results")
+
+        expected_beam_results = case_data["raw_beam_results"]
+
+        # Set seed for reproducibility
+        torch.manual_seed(42)
+        np.random.seed(42)
+
+        # Call decode
+        results = beam_obj.decode(
+            src_BC=intermediate_data["encoder_input"].to(beam_obj.device),
+            steps_B1=intermediate_data["steps_tensor"].to(beam_obj.device)
+            if intermediate_data["steps_tensor"] is not None
+            else None,
+            path_start_BL=intermediate_data["path_start_tensor"].to(beam_obj.device),
+            progress_bar=False,
+        )
+
+        # Get top beam (highest scoring)
+        top_sequence, top_log_prob = results[0][0]
+        expected_top_sequence, expected_top_log_prob = expected_beam_results[0][0]
+
+        # Assert exact match for top beam
+        assert top_sequence == expected_top_sequence, (
+            f"Top sequence mismatch.\nExpected: {expected_top_sequence}\nActual: {top_sequence}"
+        )
+
+        assert abs(top_log_prob - expected_top_log_prob) < 1e-6, (
+            f"Top log prob mismatch. Expected: {expected_top_log_prob:.8f}, Actual: {top_log_prob:.8f}"
+        )
+
+        # Verify log prob is a reasonable value (negative, not too extreme)
+        assert top_log_prob < 0, "Log probability should be negative"
+        assert top_log_prob > -1000, "Log probability should not be extremely negative"
+
+        # Verify sequence is non-empty and contains expected characters
+        assert len(top_sequence) > 0, "Generated sequence should not be empty"
+
+    def test_beam_ordering(self, model_components, comprehensive_test_data):
+        """Test that beams are ordered by log probability (highest first)."""
+        model, rds, beam_obj = model_components
+
+        case_name = "target1"
+        if case_name not in comprehensive_test_data or comprehensive_test_data[case_name] is None:
+            pytest.skip(f"Comprehensive test data for {case_name} not available")
+
+        case_data = comprehensive_test_data[case_name]
+        intermediate_data = case_data["intermediate_data"]
+
+        # Set seed for reproducibility
+        torch.manual_seed(42)
+        np.random.seed(42)
+
+        # Call decode
+        results = beam_obj.decode(
+            src_BC=intermediate_data["encoder_input"].to(beam_obj.device),
+            steps_B1=intermediate_data["steps_tensor"].to(beam_obj.device)
+            if intermediate_data["steps_tensor"] is not None
+            else None,
+            path_start_BL=intermediate_data["path_start_tensor"].to(beam_obj.device),
+            progress_bar=False,
+        )
+
+        # Extract log probs
+        log_probs = [log_prob for _, log_prob in results[0]]
+
+        # Verify beams are sorted by log probability (highest to lowest)
+        for i in range(len(log_probs) - 1):
+            assert log_probs[i] >= log_probs[i + 1], (
+                f"Beams should be ordered by log probability: beam {i} ({log_probs[i]:.6f}) should be >= beam {i + 1} ({log_probs[i + 1]:.6f})"
+            )

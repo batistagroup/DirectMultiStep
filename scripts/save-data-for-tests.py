@@ -89,12 +89,12 @@ class BeamSearchTestDataGenerator:
 
         # Reconstruct tensors on device
         src_BC = intermediate_data["encoder_input"].to(self.device)
-        steps_B1 = (
-            intermediate_data["steps_tensor"].to(self.device) if intermediate_data["steps_tensor"] is not None else None
-        )
+        # steps_B1 = (
+        #     intermediate_data["steps_tensor"].to(self.device) if intermediate_data["steps_tensor"] is not None else None
+        # )
         path_start_BL = intermediate_data["path_start_tensor"].to(self.device)
         enc_src_BCD = intermediate_data["encoder_output"].to(self.device)
-        src_mask_B11C = intermediate_data["src_mask"].to(self.device)
+        # src_mask_B11C = intermediate_data["src_mask"].to(self.device)
 
         # Initialize beam search state
         beam_enc_WCD = enc_src_BCD.repeat_interleave(S, dim=0)
@@ -191,7 +191,7 @@ def main():
             # Generate beam search steps
             step_data = generator.generate_beam_search_steps(intermediate_data, model, beam_obj)
 
-            # Generate final routes using the standard function
+            # Generate final routes using the standard function (returns only strings)
             paths = generate_routes(
                 target=case["target"],
                 n_steps=case["n_steps"],
@@ -202,14 +202,29 @@ def main():
                 ckpt_dir=generator.ckpt_dir,
             )
 
+            # Also generate raw beam search results with log probabilities
+            torch.manual_seed(42)
+            np.random.seed(42)
+            raw_beam_results = beam_obj.decode(
+                src_BC=intermediate_data["encoder_input"].to(generator.device),
+                steps_B1=intermediate_data["steps_tensor"].to(generator.device)
+                if intermediate_data["steps_tensor"] is not None
+                else None,
+                path_start_BL=intermediate_data["path_start_tensor"].to(generator.device),
+                progress_bar=False,
+            )
+
             test_data[case["name"]] = {
                 "intermediate_data": intermediate_data,
                 "beam_search_steps": step_data,
                 "final_paths": paths,
+                "raw_beam_results": raw_beam_results,  # List[List[Tuple[str, float]]]
                 "case_info": case,
             }
 
-            print(f"Generated {len(paths)} paths and {len(step_data)} beam search steps for {case['name']}")
+            print(
+                f"Generated {len(paths)} valid paths, {len(raw_beam_results[0])} raw beam results, and {len(step_data)} beam search steps for {case['name']}"
+            )
 
         except Exception as e:
             print(f"Error generating test data for {case['name']}: {e}")
