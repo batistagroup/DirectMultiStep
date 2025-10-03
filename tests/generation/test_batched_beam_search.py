@@ -166,7 +166,9 @@ class TestBatchedVsOptimizedComparison:
         vec_probs = [prob for _, prob in vec_results[0]]
 
         for i, (b_seq, o_seq, v_seq) in enumerate(zip(batched_seqs, optimized_seqs, vec_seqs, strict=False)):
-            assert b_seq == o_seq == v_seq, f"Beam {i}: Sequence mismatch.\nBatched: {b_seq}\nOptimized: {o_seq}\nVectorized: {v_seq}"
+            assert b_seq == o_seq == v_seq, (
+                f"Beam {i}: Sequence mismatch.\nBatched: {b_seq}\nOptimized: {o_seq}\nVectorized: {v_seq}"
+            )
 
         for i, (b_prob, o_prob, v_prob) in enumerate(zip(batched_probs, optimized_probs, vec_probs, strict=False)):
             assert abs(b_prob - o_prob) < 1e-5 and abs(b_prob - v_prob) < 1e-5, (
@@ -224,7 +226,9 @@ class TestBatchedVsOptimizedComparison:
         vec_probs = [prob for _, prob in vec_results[0]]
 
         for i, (b_seq, o_seq, v_seq) in enumerate(zip(batched_seqs, optimized_seqs, vec_seqs, strict=False)):
-            assert b_seq == o_seq == v_seq, f"Beam {i}: Sequence mismatch.\nBatched: {b_seq}\nOptimized: {o_seq}\nVectorized: {v_seq}"
+            assert b_seq == o_seq == v_seq, (
+                f"Beam {i}: Sequence mismatch.\nBatched: {b_seq}\nOptimized: {o_seq}\nVectorized: {v_seq}"
+            )
 
         for i, (b_prob, o_prob, v_prob) in enumerate(zip(batched_probs, optimized_probs, vec_probs, strict=False)):
             assert abs(b_prob - o_prob) < 1e-5 and abs(b_prob - v_prob) < 1e-5, (
