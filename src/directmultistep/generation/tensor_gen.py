@@ -191,7 +191,7 @@ class VectorizedBatchedBeamSearch:
             log_probs_BSV = log_probs_BSV.view(B, S, -1)
 
             # Create expansion mask for first step logic
-            is_first_step_B = step == first_steps_B
+            is_first_step_B = (step == first_steps_B)
             expand_mask_BS = torch.ones((B, S), dtype=torch.bool, device=self.device)
             expand_mask_BS[is_first_step_B, 1:] = False
 
@@ -225,16 +225,16 @@ class VectorizedBatchedBeamSearch:
             # Optimization 7: Use scatter for inactive beams instead of concatenation
             # Create combined scores tensor in-place
             all_scores = torch.empty((B, S * (S + 1)), device=self.device)
-            all_scores[:, : S * S] = candidate_buffer
-            all_scores[:, S * S :] = torch.where(inactive_mask_BS, scores_BS, float("-inf"))
+            all_scores[:, :S*S] = candidate_buffer
+            all_scores[:, S*S:] = torch.where(inactive_mask_BS, scores_BS, float("-inf"))
 
             all_beam_indices = torch.empty((B, S * (S + 1)), dtype=torch.long, device=self.device)
-            all_beam_indices[:, : S * S] = beam_idx_buffer
-            all_beam_indices[:, S * S :] = beam_expand_indices
+            all_beam_indices[:, :S*S] = beam_idx_buffer
+            all_beam_indices[:, S*S:] = beam_expand_indices
 
             all_token_indices = torch.empty((B, S * (S + 1)), dtype=torch.long, device=self.device)
-            all_token_indices[:, : S * S] = token_idx_buffer
-            all_token_indices[:, S * S :] = -1
+            all_token_indices[:, :S*S] = token_idx_buffer
+            all_token_indices[:, S*S:] = -1
 
             # Normalize scores by sequence length
             seq_lengths_BS = (sequences_BSL != self.pad_idx).sum(dim=-1).float()
@@ -242,8 +242,8 @@ class VectorizedBatchedBeamSearch:
             # Optimization 8: Compute sequence lengths more efficiently
             all_seq_lengths = torch.empty((B, S * (S + 1)), device=self.device)
             seq_lengths_expanded = seq_lengths_BS.unsqueeze(-1).expand(B, S, S).reshape(B, S * S)
-            all_seq_lengths[:, : S * S] = seq_lengths_expanded + 1  # Active candidates get +1
-            all_seq_lengths[:, S * S :] = seq_lengths_BS  # Inactive candidates keep same length
+            all_seq_lengths[:, :S*S] = seq_lengths_expanded + 1  # Active candidates get +1
+            all_seq_lengths[:, S*S:] = seq_lengths_BS  # Inactive candidates keep same length
 
             # Normalize
             normalized_scores = all_scores / (all_seq_lengths.sqrt() + 1e-6)
@@ -263,13 +263,13 @@ class VectorizedBatchedBeamSearch:
 
             # Add new tokens where applicable
             mask_add_token = selected_token_indices != -1
-            if mask_add_token.any():
-                sequences_BSL[mask_add_token, step] = selected_token_indices[mask_add_token]
+            batch_coords, beam_coords = torch.where(mask_add_token)
+            if batch_coords.numel() > 0:
+                sequences_BSL[batch_coords, beam_coords, step] = selected_token_indices[batch_coords, beam_coords]
 
             # Update active status
-            has_end_in_selected = (selected_token_indices == self.end_idx) | (
-                sequences_BSL[:, :, :step] == self.end_idx
-            ).any(dim=2)
+            has_end_in_selected = (selected_token_indices == self.end_idx) | \
+                                 (sequences_BSL[:, :, :step] == self.end_idx).any(dim=2)
             was_inactive = selected_token_indices == -1
 
             # Update all states
