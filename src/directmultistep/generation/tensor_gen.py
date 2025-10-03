@@ -125,9 +125,6 @@ class VectorizedBatchedBeamSearch:
         beam_idx_buffer = torch.zeros((B, S * S), dtype=torch.long, device=self.device)
         token_idx_buffer = torch.zeros((B, S * S), dtype=torch.long, device=self.device)
 
-        # Pre-compute beam index patterns for candidate expansion
-        beam_idx_pattern = self.beam_indices.unsqueeze(1).expand(-1, S).reshape(-1)
-
         pbar: Iterable[int] = (
             tqdm(range(first_step, max_steps), desc="Beam search", dynamic_ncols=True)
             if progress_bar
@@ -220,7 +217,8 @@ class VectorizedBatchedBeamSearch:
 
             # Flatten active candidates into pre-allocated buffer
             candidate_buffer[:] = candidate_scores_BSS.view(B, S * S)
-            beam_idx_buffer[:] = beam_idx_pattern.unsqueeze(0).expand(B, -1)
+            # Create beam indices for all candidates: each beam index repeated S times
+            beam_idx_buffer[:] = torch.arange(S, device=self.device).unsqueeze(1).expand(-1, S).reshape(1, -1).expand(B, -1)
             token_idx_buffer[:] = top_k_tokens_BSS.view(B, S * S)
 
             # Optimization 7: Use scatter for inactive beams instead of concatenation
