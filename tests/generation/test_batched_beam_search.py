@@ -392,6 +392,7 @@ class TestBatchedVsOptimizedComparison:
         )
 
         torch.manual_seed(42)
+        batched_beam.beam_size = 20
         batched_results = batched_beam.decode(
             src_BC=encoder_batch.to(batched_beam.device),
             steps_B1=steps_batch.to(batched_beam.device) if steps_batch is not None else None,
@@ -399,6 +400,7 @@ class TestBatchedVsOptimizedComparison:
             progress_bar=True,
         )
 
+        vec_beam.beam_size = 20
         vec_results = vec_beam.decode(
             src_BC=encoder_batch.to(vec_beam.device),
             steps_B1=steps_batch.to(vec_beam.device) if steps_batch is not None else None,

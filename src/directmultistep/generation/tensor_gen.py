@@ -55,8 +55,19 @@ class VectorizedBatchedBeamSearch:
         self.max_length = max_length
         self.idx_to_token = idx_to_token
 
+        # Pre-allocate reusable tensors
+        self._init_reusable_tensors()
+
+
     def __repr__(self) -> str:
         return f"VectorizedBatchedBeamSearch(beam_size={self.beam_size}, max_length={self.max_length})"
+
+    def _init_reusable_tensors(self):
+        """Pre-allocate tensors that can be reused across decode calls"""
+        S = self.beam_size
+        # Pre-compute beam indices for gather operations
+        self.beam_indices = torch.arange(S, device=self.device)
+        self.beam_offsets = torch.arange(S, device=self.device).unsqueeze(-1) * S
 
     def decode(
         self,
@@ -68,25 +79,25 @@ class VectorizedBatchedBeamSearch:
         token_processor: Callable[[list[str]], str] | None = None,
     ) -> BeamSearchOutput:
         """
-        Fully vectorized beam search without loops over batches or beams.
+        Optimized fully vectorized beam search.
         """
         B, C = src_BC.shape
         S = self.beam_size
         L = self.max_length
-        V = len(self.idx_to_token)  # Approximate vocab size
+        V = len(self.idx_to_token)
 
         # Encode source sequences once
         src_mask_B11C = (src_BC != self.pad_idx).unsqueeze(1).unsqueeze(2)
         enc_src_BCD = self.model.encoder(src_BC.long(), src_mask_B11C, steps_B1)
 
-        # Expand encoder outputs for all beams at once
-        enc_src_BSCD = enc_src_BCD.unsqueeze(1).expand(-1, S, -1, -1).reshape(B * S, -1, enc_src_BCD.size(-1))
-        src_mask_BS11C = src_mask_B11C.unsqueeze(1).expand(-1, S, -1, -1, -1).reshape(B * S, 1, 1, C)
+        # Optimization 1: Use view instead of reshape for encoder expansion
+        enc_src_BSCD = enc_src_BCD.unsqueeze(1).expand(B, S, -1, -1).contiguous().view(B * S, -1, enc_src_BCD.size(-1))
+        src_mask_BS11C = src_mask_B11C.unsqueeze(1).expand(B, S, -1, -1, -1).contiguous().view(B * S, 1, 1, C)
 
-        # Initialize all beam tensors
+        # Initialize beam tensors
         sequences_BSL = torch.full((B, S, L), self.pad_idx, dtype=torch.long, device=self.device)
         scores_BS = torch.full((B, S), float("-inf"), device=self.device)
-        scores_BS[:, 0] = 0.0  # First beam in each batch starts with score 0
+        scores_BS[:, 0] = 0.0
         active_BS = torch.ones((B, S), dtype=torch.bool, device=self.device)
 
         # Handle path starts
@@ -105,6 +116,18 @@ class VectorizedBatchedBeamSearch:
         first_step = first_steps_B.min().item()
         max_steps = L - 1 if target_lengths is None else max(target_lengths)
 
+        # Pre-allocate reusable tensors for the loop
+        batch_indices = torch.arange(B, device=self.device).unsqueeze(1).expand(B, S)
+        beam_expand_indices = self.beam_indices.unsqueeze(0).expand(B, -1)
+
+        # Pre-allocate candidate selection tensors
+        candidate_buffer = torch.zeros((B, S * S), device=self.device)
+        beam_idx_buffer = torch.zeros((B, S * S), dtype=torch.long, device=self.device)
+        token_idx_buffer = torch.zeros((B, S * S), dtype=torch.long, device=self.device)
+
+        # Pre-compute beam index patterns for candidate expansion
+        beam_idx_pattern = self.beam_indices.unsqueeze(1).expand(-1, S).reshape(-1)
+
         pbar: Iterable[int] = (
             tqdm(range(first_step, max_steps), desc="Beam search", dynamic_ncols=True)
             if progress_bar
@@ -115,9 +138,9 @@ class VectorizedBatchedBeamSearch:
             # Check which batches have started decoding
             step_active_B = step >= first_steps_B
 
-            # Vectorized check for end tokens in all sequences
+            # Optimization 2: Early termination check with single any() call
             has_end_token_BS = (sequences_BSL[:, :, :step] == self.end_idx).any(dim=2)
-            active_BS = active_BS & ~has_end_token_BS
+            active_BS &= ~has_end_token_BS
 
             # Check if all beams for each batch are inactive
             batch_finished_B = ~active_BS.any(dim=1) | ~step_active_B
@@ -135,129 +158,126 @@ class VectorizedBatchedBeamSearch:
             if not active_mask_BS.any():
                 continue
 
-            # Reshape sequences for batch processing: (B*S, L)
-            sequences_flat = sequences_BSL.view(B * S, L)
+            # Optimization 3: Only process active sequences in forward pass
             active_mask_flat = active_mask_BS.view(B * S)
+            n_active = active_mask_flat.sum().item()
 
-            # Get all sequences up to current step (including inactive for padding)
-            current_seqs = sequences_flat[:, :step]
+            if n_active == 0:
+                continue
 
-            # Forward pass for ALL beams at once (active and inactive)
+            # Get active sequence indices
+            active_indices = active_mask_flat.nonzero(as_tuple=True)[0]
+
+            # Optimization 4: Process only active sequences
+            sequences_flat = sequences_BSL.view(B * S, L)
+            active_sequences = sequences_flat[active_indices, :step]
+            active_enc_src = enc_src_BSCD[active_indices]
+            active_src_mask = src_mask_BS11C[active_indices]
+
+            # Forward pass only for active beams
             with torch.no_grad():
-                output = self.model.decoder(
-                    trg_BL=current_seqs,
-                    enc_src_BCD=enc_src_BSCD,
-                    src_mask_B11C=src_mask_BS11C,
+                active_output = self.model.decoder(
+                    trg_BL=active_sequences,
+                    enc_src_BCD=active_enc_src,
+                    src_mask_B11C=active_src_mask,
                     trg_mask_B1LL=None,
                 )
 
-            # Get log probabilities for last position
-            log_probs_BSV = torch.log_softmax(output[:, -1, :], dim=-1)
+            # Get log probabilities
+            active_log_probs = torch.log_softmax(active_output[:, -1, :], dim=-1)
+
+            # Optimization 5: Scatter back to full tensor only for top-k operation
+            log_probs_BSV = torch.full((B * S, active_log_probs.size(-1)), float("-inf"), device=self.device)
+            log_probs_BSV[active_indices] = active_log_probs
             log_probs_BSV = log_probs_BSV.view(B, S, -1)
 
             # Create expansion mask for first step logic
             is_first_step_B = (step == first_steps_B)
             expand_mask_BS = torch.ones((B, S), dtype=torch.bool, device=self.device)
-            expand_mask_BS[is_first_step_B, 1:] = False  # Only first beam expands on first step
+            expand_mask_BS[is_first_step_B, 1:] = False
 
             # Combined mask for beams that should generate candidates
             generate_mask_BS = active_mask_BS & expand_mask_BS
 
             # Get top-k tokens for each beam
-            # For active beams: get top S tokens
-            # For inactive beams: we'll mask them out anyway
             top_k_scores_BSS, top_k_tokens_BSS = torch.topk(log_probs_BSV, S, dim=-1)
 
-            # Calculate candidate scores by adding beam scores
+            # Calculate candidate scores
             candidate_scores_BSS = scores_BS.unsqueeze(-1) + top_k_scores_BSS
 
             # For first step beams, only use first beam's candidates
-            first_step_mask_B = is_first_step_B.unsqueeze(1).unsqueeze(2)
-            candidate_scores_BSS = torch.where(
-                first_step_mask_B,
-                candidate_scores_BSS[:, 0:1, :].expand(-1, S, -1),  # Broadcast first beam's scores
-                candidate_scores_BSS
-            )
+            if is_first_step_B.any():
+                first_step_mask = is_first_step_B.view(-1, 1, 1)
+                first_beam_scores = candidate_scores_BSS[:, 0:1, :].expand(B, S, S)
+                candidate_scores_BSS = torch.where(first_step_mask, first_beam_scores, candidate_scores_BSS)
 
             # Mask out invalid candidates
-            generate_mask_BSS = generate_mask_BS.unsqueeze(-1).expand(-1, -1, S)
-            candidate_scores_BSS[~generate_mask_BSS] = float("-inf")
+            generate_mask_BSS = generate_mask_BS.unsqueeze(-1)
+            candidate_scores_BSS = candidate_scores_BSS.masked_fill(~generate_mask_BSS, float("-inf"))
 
-            # Also keep inactive beams as candidates (with their current scores)
+            # Optimization 6: Avoid concatenation by using in-place operations
             inactive_mask_BS = ~active_BS & (scores_BS > float("-inf"))
 
-            # Flatten candidates for selection: (B, S*S + S)
-            all_candidate_scores = []
-            all_candidate_indices = []
-            all_candidate_tokens = []
+            # Flatten active candidates into pre-allocated buffer
+            candidate_buffer[:] = candidate_scores_BSS.view(B, S * S)
+            beam_idx_buffer[:] = beam_idx_pattern.unsqueeze(0).expand(B, -1)
+            token_idx_buffer[:] = top_k_tokens_BSS.view(B, S * S)
 
-            # Active candidates
-            active_scores_flat = candidate_scores_BSS.view(B, S * S)
-            active_beam_indices = torch.arange(S, device=self.device).unsqueeze(0).unsqueeze(-1).expand(B, -1, S).reshape(B, S * S)
-            active_token_indices = top_k_tokens_BSS.view(B, S * S)
+            # Optimization 7: Use scatter for inactive beams instead of concatenation
+            # Create combined scores tensor in-place
+            all_scores = torch.empty((B, S * (S + 1)), device=self.device)
+            all_scores[:, :S*S] = candidate_buffer
+            all_scores[:, S*S:] = torch.where(inactive_mask_BS, scores_BS, float("-inf"))
 
-            # Inactive beam "candidates" (just keeping them as is)
-            inactive_scores = torch.where(inactive_mask_BS, scores_BS, float("-inf"))
-            inactive_beam_indices = torch.arange(S, device=self.device).unsqueeze(0).expand(B, -1)
-            inactive_token_indices = torch.full((B, S), -1, device=self.device)  # Dummy token
+            all_beam_indices = torch.empty((B, S * (S + 1)), dtype=torch.long, device=self.device)
+            all_beam_indices[:, :S*S] = beam_idx_buffer
+            all_beam_indices[:, S*S:] = beam_expand_indices
 
-            # Combine all candidates
-            all_scores = torch.cat([active_scores_flat, inactive_scores], dim=1)  # (B, S*S + S)
-            all_beam_indices = torch.cat([active_beam_indices, inactive_beam_indices], dim=1)
-            all_token_indices = torch.cat([active_token_indices, inactive_token_indices], dim=1)
+            all_token_indices = torch.empty((B, S * (S + 1)), dtype=torch.long, device=self.device)
+            all_token_indices[:, :S*S] = token_idx_buffer
+            all_token_indices[:, S*S:] = -1
 
             # Normalize scores by sequence length
             seq_lengths_BS = (sequences_BSL != self.pad_idx).sum(dim=-1).float()
 
-            # Expand seq_lengths for all candidates
-            active_seq_lengths = seq_lengths_BS.unsqueeze(-1).expand(-1, -1, S).reshape(B, S * S)
-            inactive_seq_lengths = seq_lengths_BS
-            all_seq_lengths = torch.cat([active_seq_lengths, inactive_seq_lengths], dim=1)
-
-            # Add 1 to length for active candidates (new token)
-            is_active_candidate = torch.cat([
-                torch.ones((B, S * S), dtype=torch.bool, device=self.device),
-                torch.zeros((B, S), dtype=torch.bool, device=self.device)
-            ], dim=1)
-            all_seq_lengths = torch.where(is_active_candidate, all_seq_lengths + 1, all_seq_lengths)
+            # Optimization 8: Compute sequence lengths more efficiently
+            all_seq_lengths = torch.empty((B, S * (S + 1)), device=self.device)
+            seq_lengths_expanded = seq_lengths_BS.unsqueeze(-1).expand(B, S, S).reshape(B, S * S)
+            all_seq_lengths[:, :S*S] = seq_lengths_expanded + 1  # Active candidates get +1
+            all_seq_lengths[:, S*S:] = seq_lengths_BS  # Inactive candidates keep same length
 
             # Normalize
             normalized_scores = all_scores / (all_seq_lengths.sqrt() + 1e-6)
 
             # Select top S beams for each batch
-            top_scores_normalized, top_indices = torch.topk(normalized_scores, S, dim=1)
+            _, top_indices = torch.topk(normalized_scores, S, dim=1)
 
             # Gather selected beams
-            batch_indices = torch.arange(B, device=self.device).unsqueeze(1).expand(-1, S)
             selected_beam_indices = torch.gather(all_beam_indices, 1, top_indices)
             selected_token_indices = torch.gather(all_token_indices, 1, top_indices)
             selected_scores = torch.gather(all_scores, 1, top_indices)
 
-            # Update sequences - first copy the selected beams
-            new_sequences_BSL = torch.gather(
-                sequences_BSL,
-                1,
-                selected_beam_indices.unsqueeze(-1).expand(-1, -1, L)
-            )
+            # Optimization 9: Update sequences more efficiently
+            # First, gather the sequences
+            gather_indices = selected_beam_indices.unsqueeze(-1).expand(B, S, L)
+            sequences_BSL = torch.gather(sequences_BSL, 1, gather_indices)
 
-            # Add new tokens where applicable (token_index != -1)
+            # Add new tokens where applicable
             mask_add_token = selected_token_indices != -1
-            # Use proper indexing with batch and beam coordinates
             batch_coords, beam_coords = torch.where(mask_add_token)
             if batch_coords.numel() > 0:
-                new_sequences_BSL[batch_coords, beam_coords, step] = selected_token_indices[batch_coords, beam_coords]
+                sequences_BSL[batch_coords, beam_coords, step] = selected_token_indices[batch_coords, beam_coords]
 
             # Update active status
             has_end_in_selected = (selected_token_indices == self.end_idx) | \
-                                    (new_sequences_BSL[:, :, :step] == self.end_idx).any(dim=2)
+                                    (sequences_BSL[:, :, :step] == self.end_idx).any(dim=2)
             was_inactive = selected_token_indices == -1
 
             # Update all states
-            sequences_BSL = new_sequences_BSL
             scores_BS = selected_scores
             active_BS = ~has_end_in_selected & ~was_inactive
 
-        # Extract final results
+        # Extract final results (unchanged)
         outputs_BS2_nt: list[list[tuple[str, float]]] = []
 
         for b in range(B):
@@ -280,6 +300,168 @@ class VectorizedBatchedBeamSearch:
                 batch_results.append((output_str, scores_BS[b, s].item()))
 
             outputs_BS2_nt.append(batch_results)
+
+        return outputs_BS2_nt
+
+
+class BeamSearchOptimized:
+    def __init__(
+        self,
+        model: nn.Module,
+        beam_size: int,
+        start_idx: int,
+        pad_idx: int,
+        end_idx: int,
+        max_length: int,
+        idx_to_token: dict[int, str],
+        device: torch.device,
+    ):
+        self.model = model
+        self.beam_size = beam_size
+        self.start_idx = start_idx
+        self.pad_idx = pad_idx
+        self.end_idx = end_idx
+        self.device = device
+        self.max_length = max_length
+        self.idx_to_token = idx_to_token
+
+    def __repr__(self) -> str:
+        return f"BeamSearchOptimized(beam_width={self.beam_size}, max_length={self.max_length})"
+
+    def decode(
+        self,
+        src_BC: Tensor,
+        steps_B1: Tensor | None,
+        path_start_BL: Tensor | None = None,
+        progress_bar: bool = True,
+        token_processor: Callable[[list[str]], str] | None = None,
+    ) -> BeamSearchOutput:
+        """
+        src_BC: product + one_sm (B, C)
+        steps_B1: number of steps (B, 1)
+
+        Define S as beam_size.
+        Define W as B*S (W for Window, a window for output).
+        _nt stands for not a tensor, a regular list.
+        """
+        B, C = src_BC.shape
+        S = self.beam_size
+        L = self.max_length
+
+        src_mask_B11C = (src_BC != self.pad_idx).unsqueeze(1).unsqueeze(2)
+        enc_src_BCD = self.model.encoder(src_BC.long(), src_mask_B11C, steps_B1)
+        beam_enc_WCD = enc_src_BCD.repeat_interleave(S, dim=0)
+
+        beam_src_WC = src_BC.repeat_interleave(S, dim=0)
+        beam_src_mask_W11C = (beam_src_WC != self.pad_idx).unsqueeze(1).unsqueeze(2)
+
+        beam_idxs_WL = torch.full((B * S, L), self.pad_idx, dtype=torch.long, device=self.device)
+        if path_start_BL is None:
+            beam_idxs_WL[:, 0] = self.start_idx
+            first_step = 1
+            beam_log_probs_W = torch.zeros(B * S, device=self.device)
+        else:
+            beam_idxs_WL[:, : path_start_BL.size(1)] = path_start_BL
+            first_step = path_start_BL.size(1)
+            beam_log_probs_W = torch.zeros(B * S, device=self.device)
+
+        finished_sequences_W = torch.zeros(B * S, dtype=torch.bool, device=self.device)
+        logger.info(
+            f"Generating routes with beam size {S}. The progress bar may end early if all beams find end token."
+        )
+        pbar: Iterable[int] = (
+            tqdm(range(first_step, L - 1), dynamic_ncols=True) if progress_bar else range(first_step, L - 1)
+        )
+        for step in pbar:
+            with torch.no_grad():
+                output_WLV = self.model.decoder(
+                    trg_BL=beam_idxs_WL[:, :step],
+                    enc_src_BCD=beam_enc_WCD,
+                    src_mask_B11C=beam_src_mask_W11C,
+                    trg_mask_B1LL=None,
+                )
+            W, _, V = output_WLV.shape
+            output_WV = output_WLV[:, -1, :]
+            log_probs_WV = torch.log_softmax(output_WV, dim=-1)
+
+            finished_sequences_W = torch.any(beam_idxs_WL == self.end_idx, dim=-1)
+            active_mask_W = ~finished_sequences_W
+            if finished_sequences_W.all():
+                break
+
+            if step == first_step:
+                log_probs_BSV = log_probs_WV.view(B, S, -1)
+                log_probs_WS, top_k_idxs_WS = torch.topk(log_probs_BSV[:, 0, :], S, dim=-1)
+                beam_log_probs_W = log_probs_WS.view(B * S)
+                beam_idxs_WL[:, step] = top_k_idxs_WS.view(B * S)
+            else:
+                active_WV = active_mask_W.unsqueeze(1).expand(-1, V)
+                cur_log_probs_WV = beam_log_probs_W.unsqueeze(1) + log_probs_WV
+
+                _, act_top_k_idxs_WS = torch.topk(cur_log_probs_WV[active_WV].view(-1, V), S, dim=-1)
+                act_top_k_idxs_BSS = act_top_k_idxs_WS.view(B, -1, S)
+
+                active_WL = active_mask_W.unsqueeze(-1).repeat(1, L)
+                active_beams_WL = beam_idxs_WL[active_WL].view(-1, L)
+                active_beams_BSL = active_beams_WL.view(B, -1, L)
+                _S = active_beams_BSL.size(1)
+                active_beams_BSSL = active_beams_BSL.unsqueeze(2).repeat(1, 1, S, 1)
+                active_beams_BSSL[..., step] = act_top_k_idxs_BSS
+                active_beams_BSsqL = active_beams_BSSL.view(B, -1, L)
+                cur_log_probs_WS = cur_log_probs_WV[active_mask_W].view(-1, V).gather(1, act_top_k_idxs_WS)
+
+                sequence_lengths_WL = (active_beams_WL.ne(self.pad_idx).sum(dim=1).float()).unsqueeze(1)
+
+                normalized_act_log_probs_WS = cur_log_probs_WS / (sequence_lengths_WL.sqrt() + 1e-6)
+                normalized_act_log_probs_BSsq = normalized_act_log_probs_WS.view(B, -1)
+                _, best_idxs_BS = normalized_act_log_probs_BSsq.topk(S, dim=-1)
+
+                active_beams_WL = active_beams_BSsqL.view(-1, L).gather(
+                    0, best_idxs_BS.view(-1).unsqueeze(-1).expand(-1, L)
+                )
+                active_log_probs_W = cur_log_probs_WS.view(-1).gather(0, best_idxs_BS.view(-1))
+
+                active_beams_BSL = active_beams_WL.view(B, -1, L)
+                active_log_probs_BS = active_log_probs_W.view(B, -1)
+
+                inactive_beams_WL = beam_idxs_WL[~active_WL]
+                inactive_log_probs_W = beam_log_probs_W[~active_mask_W]
+                inactive_beams_BSL = inactive_beams_WL.view(B, -1, L)
+                inactive_log_probs_BS = inactive_log_probs_W.view(B, -1)
+
+                both_beams_BSL = torch.cat([active_beams_BSL, inactive_beams_BSL], dim=1)
+                both_log_probs_BS = torch.cat([active_log_probs_BS, inactive_log_probs_BS], dim=1)
+
+                both_beams_WL = both_beams_BSL.view(-1, L)
+                both_log_probs_W = both_log_probs_BS.view(-1)
+
+                both_seq_lengths_W = both_beams_WL.ne(self.pad_idx).sum(dim=1).float()
+                both_normalized_log_probs_WS = both_log_probs_W / (both_seq_lengths_W.sqrt() + 1e-6)
+                both_normalized_log_probs_BSsq = both_normalized_log_probs_WS.view(B, -1)
+                _, best_idxs_BS = both_normalized_log_probs_BSsq.topk(S, dim=-1)
+
+                beam_idxs_WL = both_beams_BSL.gather(1, best_idxs_BS.unsqueeze(-1).expand(-1, -1, L)).view(-1, L)
+                beam_log_probs_W = both_log_probs_BS.gather(1, best_idxs_BS).view(-1)
+
+        beam_idxs_BSL = beam_idxs_WL.view(B, S, L)
+        beam_log_probs_BS = beam_log_probs_W.view(B, S)
+
+        outputs_BS2_nt: list[list[tuple[str, float]]] = [[] for _ in range(B)]
+
+        for b in range(B):
+            for s in range(S):
+                output_tokens = []
+                for L_idx in beam_idxs_BSL[b, s]:
+                    if L_idx == self.start_idx:
+                        continue
+                    if L_idx == self.end_idx:
+                        break
+                    output_tokens.append(self.idx_to_token[L_idx.item()])
+
+                output_str = token_processor(output_tokens) if token_processor is not None else "".join(output_tokens)
+
+                log_prob = beam_log_probs_BS[b, s].item()
+                outputs_BS2_nt[b].append((output_str, log_prob))
 
         return outputs_BS2_nt
 
@@ -553,167 +735,5 @@ class BatchedBeamSearch:
                 batch_results.append((output_str, beam.score))
 
             outputs_BS2_nt.append(batch_results)
-
-        return outputs_BS2_nt
-
-
-class BeamSearchOptimized:
-    def __init__(
-        self,
-        model: nn.Module,
-        beam_size: int,
-        start_idx: int,
-        pad_idx: int,
-        end_idx: int,
-        max_length: int,
-        idx_to_token: dict[int, str],
-        device: torch.device,
-    ):
-        self.model = model
-        self.beam_size = beam_size
-        self.start_idx = start_idx
-        self.pad_idx = pad_idx
-        self.end_idx = end_idx
-        self.device = device
-        self.max_length = max_length
-        self.idx_to_token = idx_to_token
-
-    def __repr__(self) -> str:
-        return f"BeamSearchOptimized(beam_width={self.beam_size}, max_length={self.max_length})"
-
-    def decode(
-        self,
-        src_BC: Tensor,
-        steps_B1: Tensor | None,
-        path_start_BL: Tensor | None = None,
-        progress_bar: bool = True,
-        token_processor: Callable[[list[str]], str] | None = None,
-    ) -> BeamSearchOutput:
-        """
-        src_BC: product + one_sm (B, C)
-        steps_B1: number of steps (B, 1)
-
-        Define S as beam_size.
-        Define W as B*S (W for Window, a window for output).
-        _nt stands for not a tensor, a regular list.
-        """
-        B, C = src_BC.shape
-        S = self.beam_size
-        L = self.max_length
-
-        src_mask_B11C = (src_BC != self.pad_idx).unsqueeze(1).unsqueeze(2)
-        enc_src_BCD = self.model.encoder(src_BC.long(), src_mask_B11C, steps_B1)
-        beam_enc_WCD = enc_src_BCD.repeat_interleave(S, dim=0)
-
-        beam_src_WC = src_BC.repeat_interleave(S, dim=0)
-        beam_src_mask_W11C = (beam_src_WC != self.pad_idx).unsqueeze(1).unsqueeze(2)
-
-        beam_idxs_WL = torch.full((B * S, L), self.pad_idx, dtype=torch.long, device=self.device)
-        if path_start_BL is None:
-            beam_idxs_WL[:, 0] = self.start_idx
-            first_step = 1
-            beam_log_probs_W = torch.zeros(B * S, device=self.device)
-        else:
-            beam_idxs_WL[:, : path_start_BL.size(1)] = path_start_BL
-            first_step = path_start_BL.size(1)
-            beam_log_probs_W = torch.zeros(B * S, device=self.device)
-
-        finished_sequences_W = torch.zeros(B * S, dtype=torch.bool, device=self.device)
-        logger.info(
-            f"Generating routes with beam size {S}. The progress bar may end early if all beams find end token."
-        )
-        pbar: Iterable[int] = (
-            tqdm(range(first_step, L - 1), dynamic_ncols=True) if progress_bar else range(first_step, L - 1)
-        )
-        for step in pbar:
-            with torch.no_grad():
-                output_WLV = self.model.decoder(
-                    trg_BL=beam_idxs_WL[:, :step],
-                    enc_src_BCD=beam_enc_WCD,
-                    src_mask_B11C=beam_src_mask_W11C,
-                    trg_mask_B1LL=None,
-                )
-            W, _, V = output_WLV.shape
-            output_WV = output_WLV[:, -1, :]
-            log_probs_WV = torch.log_softmax(output_WV, dim=-1)
-
-            finished_sequences_W = torch.any(beam_idxs_WL == self.end_idx, dim=-1)
-            active_mask_W = ~finished_sequences_W
-            if finished_sequences_W.all():
-                break
-
-            if step == first_step:
-                log_probs_BSV = log_probs_WV.view(B, S, -1)
-                log_probs_WS, top_k_idxs_WS = torch.topk(log_probs_BSV[:, 0, :], S, dim=-1)
-                beam_log_probs_W = log_probs_WS.view(B * S)
-                beam_idxs_WL[:, step] = top_k_idxs_WS.view(B * S)
-            else:
-                active_WV = active_mask_W.unsqueeze(1).expand(-1, V)
-                cur_log_probs_WV = beam_log_probs_W.unsqueeze(1) + log_probs_WV
-
-                _, act_top_k_idxs_WS = torch.topk(cur_log_probs_WV[active_WV].view(-1, V), S, dim=-1)
-                act_top_k_idxs_BSS = act_top_k_idxs_WS.view(B, -1, S)
-
-                active_WL = active_mask_W.unsqueeze(-1).repeat(1, L)
-                active_beams_WL = beam_idxs_WL[active_WL].view(-1, L)
-                active_beams_BSL = active_beams_WL.view(B, -1, L)
-                _S = active_beams_BSL.size(1)
-                active_beams_BSSL = active_beams_BSL.unsqueeze(2).repeat(1, 1, S, 1)
-                active_beams_BSSL[..., step] = act_top_k_idxs_BSS
-                active_beams_BSsqL = active_beams_BSSL.view(B, -1, L)
-                cur_log_probs_WS = cur_log_probs_WV[active_mask_W].view(-1, V).gather(1, act_top_k_idxs_WS)
-
-                sequence_lengths_WL = (active_beams_WL.ne(self.pad_idx).sum(dim=1).float()).unsqueeze(1)
-
-                normalized_act_log_probs_WS = cur_log_probs_WS / (sequence_lengths_WL.sqrt() + 1e-6)
-                normalized_act_log_probs_BSsq = normalized_act_log_probs_WS.view(B, -1)
-                _, best_idxs_BS = normalized_act_log_probs_BSsq.topk(S, dim=-1)
-
-                active_beams_WL = active_beams_BSsqL.view(-1, L).gather(
-                    0, best_idxs_BS.view(-1).unsqueeze(-1).expand(-1, L)
-                )
-                active_log_probs_W = cur_log_probs_WS.view(-1).gather(0, best_idxs_BS.view(-1))
-
-                active_beams_BSL = active_beams_WL.view(B, -1, L)
-                active_log_probs_BS = active_log_probs_W.view(B, -1)
-
-                inactive_beams_WL = beam_idxs_WL[~active_WL]
-                inactive_log_probs_W = beam_log_probs_W[~active_mask_W]
-                inactive_beams_BSL = inactive_beams_WL.view(B, -1, L)
-                inactive_log_probs_BS = inactive_log_probs_W.view(B, -1)
-
-                both_beams_BSL = torch.cat([active_beams_BSL, inactive_beams_BSL], dim=1)
-                both_log_probs_BS = torch.cat([active_log_probs_BS, inactive_log_probs_BS], dim=1)
-
-                both_beams_WL = both_beams_BSL.view(-1, L)
-                both_log_probs_W = both_log_probs_BS.view(-1)
-
-                both_seq_lengths_W = both_beams_WL.ne(self.pad_idx).sum(dim=1).float()
-                both_normalized_log_probs_WS = both_log_probs_W / (both_seq_lengths_W.sqrt() + 1e-6)
-                both_normalized_log_probs_BSsq = both_normalized_log_probs_WS.view(B, -1)
-                _, best_idxs_BS = both_normalized_log_probs_BSsq.topk(S, dim=-1)
-
-                beam_idxs_WL = both_beams_BSL.gather(1, best_idxs_BS.unsqueeze(-1).expand(-1, -1, L)).view(-1, L)
-                beam_log_probs_W = both_log_probs_BS.gather(1, best_idxs_BS).view(-1)
-
-        beam_idxs_BSL = beam_idxs_WL.view(B, S, L)
-        beam_log_probs_BS = beam_log_probs_W.view(B, S)
-
-        outputs_BS2_nt: list[list[tuple[str, float]]] = [[] for _ in range(B)]
-
-        for b in range(B):
-            for s in range(S):
-                output_tokens = []
-                for L_idx in beam_idxs_BSL[b, s]:
-                    if L_idx == self.start_idx:
-                        continue
-                    if L_idx == self.end_idx:
-                        break
-                    output_tokens.append(self.idx_to_token[L_idx.item()])
-
-                output_str = token_processor(output_tokens) if token_processor is not None else "".join(output_tokens)
-
-                log_prob = beam_log_probs_BS[b, s].item()
-                outputs_BS2_nt[b].append((output_str, log_prob))
 
         return outputs_BS2_nt

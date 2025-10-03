@@ -57,11 +57,14 @@ def run_beam_hard() -> None:
     n_steps_list = [1, 2, 5, 4]
 
     from tqdm import tqdm
+
     beams = [5, 20, 50]
 
     for beam in beams:
         print(f"Beam size: {beam}")
-        for target, sm, n_steps in tqdm(zip(targets_list, sms_list, n_steps_list, strict=False), total=len(targets_list)):
+        for target, sm, n_steps in tqdm(
+            zip(targets_list, sms_list, n_steps_list, strict=False), total=len(targets_list)
+        ):
             generate_routes(
                 target=target,
                 n_steps=n_steps,
