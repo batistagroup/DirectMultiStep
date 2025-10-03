@@ -8,7 +8,7 @@ import numpy as np
 import pytest
 import torch
 
-from directmultistep.generation.tensor_gen import BatchedBeamSearch, BeamSearchOptimized, VectorizedBatchedBeamSearch
+from directmultistep.generation.tensor_gen import BeamSearchOptimized, VectorizedBatchedBeamSearch
 from directmultistep.utils.dataset import RoutesProcessing
 
 torch.manual_seed(42)
