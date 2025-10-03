@@ -15,6 +15,7 @@ torch.manual_seed(42)
 np.random.seed(42)
 
 
+@pytest.mark.ckptreq
 class TestBatchedBeamSearch:
     """Test suite for BatchedBeamSearch functionality."""
 
@@ -60,6 +61,7 @@ class TestBatchedBeamSearch:
         assert isinstance(beam_obj.device, torch.device)
 
 
+@pytest.mark.ckptreq
 class TestBatchedVsOptimizedComparison:
     """Test that BatchedBeamSearch produces same results as BeamSearchOptimized for single batch."""
 

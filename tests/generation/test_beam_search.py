@@ -16,6 +16,7 @@ torch.manual_seed(42)
 np.random.seed(42)
 
 
+@pytest.mark.ckptreq
 class TestBeamSearch:
     """Test suite for beam search functionality."""
 

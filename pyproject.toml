@@ -81,3 +81,6 @@ lint.select = [
     "I",   # isort
 ]
 lint.ignore = ["E501"]
+
+[tool.pytest.ini_options]
+addopts = "-m 'not ckptreq'"
