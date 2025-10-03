@@ -56,54 +56,32 @@ def run_beam_hard() -> None:
     sms_list = [None, "O=S(=O)(Cl)c1cccnc1", "CCOC(=O)c1ccc(N)cc1", "C[C@@]1(C(=O)O)CCCN1"]
     n_steps_list = [1, 2, 5, 4]
 
-    routes = generate_routes_batched(
-        targets=targets_list,
-        n_steps_list=n_steps_list,
-        starting_materials=sms_list,
-        beam_size=5,
-        model="flash",
-        config_path=Path("data/configs/dms_dictionary.yaml"),
-        ckpt_dir=Path("data/checkpoints"),
-    )
     from tqdm import tqdm
+    beams = [5, 20, 50]
 
-    old_r_coll = []
+    for beam in beams:
+        print(f"Beam size: {beam}")
+        for target, sm, n_steps in tqdm(zip(targets_list, sms_list, n_steps_list, strict=False), total=len(targets_list)):
+            generate_routes(
+                target=target,
+                n_steps=n_steps,
+                starting_material=sm,
+                beam_size=beam,
+                model="flash",
+                config_path=Path("data/configs/dms_dictionary.yaml"),
+                ckpt_dir=Path("data/checkpoints"),
+                show_progress=False,
+            )
 
-    for target, sm, n_steps in tqdm(zip(targets_list, sms_list, n_steps_list, strict=False), total=len(targets_list)):
-        old_rs = generate_routes(
-            target=target,
-            n_steps=n_steps,
-            starting_material=sm,
-            beam_size=5,
+        generate_routes_batched(
+            targets=targets_list,
+            n_steps_list=n_steps_list,
+            starting_materials=sms_list,
+            beam_size=beam,
             model="flash",
             config_path=Path("data/configs/dms_dictionary.yaml"),
             ckpt_dir=Path("data/checkpoints"),
-            show_progress=False,
         )
-        old_r_coll.append(old_rs)
-
-    with open("b-hard-routes.txt", "w") as f:
-        for i, (target, routes_for_target) in enumerate(zip(targets_list, routes, strict=False)):
-            f.write(f"Target {i + 1}: {target}\n")
-            f.write(f"Routes: {len(routes_for_target)}\n")
-            for route in routes_for_target[:3]:
-                f.write(route + "\n")
-    with open("b1-routes.txt", "w") as f:
-        for i, (target, routes_for_target) in enumerate(zip(targets_list, old_r_coll, strict=False)):
-            f.write(f"Target {i + 1}: {target}\n")
-            f.write(f"Routes: {len(routes_for_target)}\n")
-            for route in routes_for_target[:3]:
-                f.write(route + "\n")
-
-    routes = generate_routes_batched(
-        targets=targets_list * 16,
-        n_steps_list=n_steps_list * 16,
-        starting_materials=sms_list * 16,
-        beam_size=5,
-        model="flash",
-        config_path=Path("data/configs/dms_dictionary.yaml"),
-        ckpt_dir=Path("data/checkpoints"),
-    )
 
 
 if __name__ == "__main__":
