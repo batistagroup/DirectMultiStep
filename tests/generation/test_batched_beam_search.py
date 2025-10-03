@@ -8,7 +8,7 @@ import numpy as np
 import pytest
 import torch
 
-from directmultistep.generation.tensor_gen import BatchedBeamSearch, BeamSearchOptimized
+from directmultistep.generation.tensor_gen import BatchedBeamSearch, BeamSearchOptimized, VectorizedBatchedBeamSearch
 from directmultistep.utils.dataset import RoutesProcessing
 
 torch.manual_seed(42)
@@ -100,12 +100,22 @@ class TestBatchedVsOptimizedComparison:
             idx_to_token=rds.idx_to_token,
             device=device,
         )
+        vec_beam = VectorizedBatchedBeamSearch(
+            model=model,
+            beam_size=5,
+            start_idx=0,
+            pad_idx=52,
+            end_idx=22,
+            max_length=1074,
+            idx_to_token=rds.idx_to_token,
+            device=device,
+        )
 
-        return model, rds, batched_beam, optimized_beam
+        return model, rds, batched_beam, optimized_beam, vec_beam
 
     def test_single_batch_equivalence(self, model_components):
         """Test that BatchedBeamSearch gives same results as BeamSearchOptimized for single batch."""
-        model, rds, batched_beam, optimized_beam = model_components
+        model, rds, batched_beam, optimized_beam, _ = model_components
 
         target = "CNCc1ccccc1"
         starting_material = None
@@ -156,7 +166,7 @@ class TestBatchedVsOptimizedComparison:
 
     def test_single_batch_equivalence_with_sm(self, model_components):
         """Test equivalence when starting material is provided."""
-        model, rds, batched_beam, optimized_beam = model_components
+        model, rds, batched_beam, optimized_beam, _ = model_components
 
         target = "CNCc1ccccc1"
         starting_material = "CN"
@@ -204,7 +214,7 @@ class TestBatchedVsOptimizedComparison:
 
     def test_multiple_batches_independently_correct(self, model_components):
         """Test that batched decoding produces correct results for each batch item independently."""
-        model, rds, batched_beam, optimized_beam = model_components
+        model, rds, batched_beam, optimized_beam, _ = model_components
 
         targets = ["CNCc1ccccc1", "CC(=O)OC1=CC=CC=C1C(=O)O"]
         n_steps_list = [1, 1]
@@ -258,7 +268,7 @@ class TestBatchedVsOptimizedComparison:
 
     def test_multiple_batches_independently_correct_hard(self, model_components):
         """Test that batched decoding produces correct results for each batch item independently."""
-        model, rds, batched_beam, optimized_beam = model_components
+        model, rds, batched_beam, optimized_beam, _ = model_components
 
         targets_list = [
             "CC(=O)OC1=CC=CC=C1C(=O)O",
@@ -314,4 +324,55 @@ class TestBatchedVsOptimizedComparison:
                 assert b_seq == o_seq, (
                     f"Target {idx} ('{target}'), Beam {beam_idx}: Sequence mismatch.\n"
                     f"Batched: {b_seq}\nOptimized: {o_seq}"
+                )
+
+    def test_vector_non_vector(self, model_components):
+        """Test that batched decoding produces correct results for each batch item independently."""
+        model, rds, batched_beam, optimized_beam, vec_beam = model_components
+
+        targets_list = [
+            "CC(=O)OC1=CC=CC=C1C(=O)O",
+            "CNCc1cc(-c2ccccc2F)n(S(=O)(=O)c2cccnc2)c1",
+            "O=C(c1ccc(NS(=O)(=O)c2cccc3cccnc23)cc1)N1CCN(CC2CC2)CC1",
+            "COc1ccc(-n2nccn2)c(C(=O)N2CCC[C@@]2(C)c2nc3c(C)c(Cl)ccc3[nH]2)c1",
+        ]
+        sms_list = [None, "O=S(=O)(Cl)c1cccnc1", "CCOC(=O)c1ccc(N)cc1", "C[C@@]1(C(=O)O)CCCN1"]
+        n_steps_list = [1, 2, 5, 4]
+
+        from directmultistep.generate import prepare_batched_input_tensors
+
+        encoder_batch, steps_batch, path_starts, target_lengths = prepare_batched_input_tensors(
+            targets=targets_list,
+            n_steps_list=n_steps_list,
+            starting_materials=sms_list,
+            rds=rds,
+            product_max_length=rds.product_max_length,
+            sm_max_length=rds.sm_max_length,
+        )
+
+        torch.manual_seed(42)
+        batched_results = batched_beam.decode(
+            src_BC=encoder_batch.to(batched_beam.device),
+            steps_B1=steps_batch.to(batched_beam.device) if steps_batch is not None else None,
+            path_starts=[ps.to(batched_beam.device) for ps in path_starts],
+            progress_bar=True,
+        )
+
+        vec_results = vec_beam.decode(
+            src_BC=encoder_batch.to(vec_beam.device),
+            steps_B1=steps_batch.to(vec_beam.device) if steps_batch is not None else None,
+            path_starts=[ps.to(vec_beam.device) for ps in path_starts],
+            progress_bar=True,
+        )
+
+
+        for idx, (target) in enumerate(targets_list):
+
+            batched_seqs = [seq for seq, _ in batched_results[idx]]
+            vec_seqs = [seq for seq, _ in vec_results[idx]]
+
+            for beam_idx, (b_seq, v_seq) in enumerate(zip(batched_seqs, vec_seqs, strict=False)):
+                assert b_seq == v_seq, (
+                    f"Target {idx} ('{target}'), Beam {beam_idx}: Sequence mismatch.\n"
+                    f"Batched: {b_seq}\nVectorized: {v_seq}"
                 )
