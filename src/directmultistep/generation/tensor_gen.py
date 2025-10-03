@@ -231,13 +231,8 @@ class BatchedBeamSearch:
 
             # OPTIMIZATION: Use pre-allocated tensors and efficient concatenation
             n_candidates = S * S
-            all_scores = torch.cat(
-                [
-                    candidate_buffer,
-                    torch.where(inactive_mask_BS, scores_BS, torch.tensor(float("-inf"), device=self.device)),
-                ],
-                dim=1,
-            )
+            inactive_scores = torch.where(inactive_mask_BS, scores_BS, scores_BS.new_full((), float("-inf")))
+            all_scores = torch.cat([candidate_buffer, inactive_scores], dim=1)
 
             all_beam_indices = torch.cat(
                 [beam_idx_buffer, torch.arange(S, device=self.device).unsqueeze(0).expand(B, -1)], dim=1

@@ -164,9 +164,9 @@ results = beam_search.decode(
 
 ```python
 def generate_routes_batched(
-    targets: list[str],
-    n_steps_list: list[int | None],
-    starting_materials: list[str | None],
+    targets: Sequence[str],
+    n_steps_list: Sequence[int] | None,
+    starting_materials: Sequence[str | None],
     beam_size: int,
     model: ModelName | torch.nn.Module,
     config_path: Path,
@@ -180,7 +180,7 @@ Generate synthesis routes for multiple targets using batched beam search.
 
 **Arguments:**
 - `targets`: List of SMILES strings of target molecules
-- `n_steps_list`: List of number of synthesis steps for each target (can contain None)
+- `n_steps_list`: List of number of synthesis steps for each target or None (for explorer)
 - `starting_materials`: List of starting materials for each target (can contain None)
 - `beam_size`: Beam size for the beam search
 - `model`: Either a model name or a torch.nn.Module
@@ -198,9 +198,9 @@ Generate synthesis routes for multiple targets using batched beam search.
 
 ```python
 def prepare_batched_input_tensors(
-    targets: list[str],
-    n_steps_list: list[int | None],
-    starting_materials: list[str | None],
+    targets: Sequence[str],
+    n_steps_list: Sequence[int] | None,
+    starting_materials: Sequence[str | None],
     rds: RoutesProcessing,
     product_max_length: int,
     sm_max_length: int,

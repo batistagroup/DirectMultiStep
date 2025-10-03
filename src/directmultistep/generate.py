@@ -140,7 +140,7 @@ def prepare_input_tensors(
 
 def prepare_batched_input_tensors(
     targets: Sequence[str],
-    n_steps_list: Sequence[int | None],
+    n_steps_list: Sequence[int] | None,
     starting_materials: Sequence[str | None],
     rds: RoutesProcessing,
     product_max_length: int,
@@ -151,7 +151,7 @@ def prepare_batched_input_tensors(
 
     Args:
         targets: List of SMILES strings of target molecules
-        n_steps_list: List of number of synthesis steps for each target (can contain None)
+        n_steps_list: List of number of synthesis steps for each target, or None if not using steps
         starting_materials: List of SMILES strings of starting materials (can contain None)
         rds: RoutesProcessing object for tokenization
         product_max_length: Maximum length of the product SMILES sequence
@@ -161,22 +161,22 @@ def prepare_batched_input_tensors(
     Returns:
         A tuple containing:
             - encoder_batch: Batched input tensor for the encoder [B, C]
-            - steps_batch: Batched tensor of steps [B, 1], or None if all n_steps are None
+            - steps_batch: Batched tensor of steps [B, 1], or None if n_steps_list is None
             - path_starts: List of initial path tensors for decoder (variable lengths)
             - target_lengths: List of target max lengths per batch item
     """
-    if len(targets) != len(n_steps_list) or len(targets) != len(starting_materials):
-        raise ValueError(
-            f"Length mismatch: targets={len(targets)}, "
-            f"n_steps_list={len(n_steps_list)}, starting_materials={len(starting_materials)}"
-        )
+    if n_steps_list is not None and len(targets) != len(n_steps_list):
+        raise ValueError(f"Length mismatch: targets={len(targets)}, n_steps_list={len(n_steps_list)}")
+    if len(targets) != len(starting_materials):
+        raise ValueError(f"Length mismatch: targets={len(targets)}, starting_materials={len(starting_materials)}")
 
     encoder_inputs = []
-    steps_tensors = []
+    steps_tensors: list[torch.Tensor] = []
     path_starts = []
     target_lengths = []
 
-    for target, n_steps, sm in zip(targets, n_steps_list, starting_materials, strict=False):
+    for i, (target, sm) in enumerate(zip(targets, starting_materials, strict=False)):
+        n_steps = n_steps_list[i] if n_steps_list is not None else None
         encoder_inp, steps_tens, path_tens = prepare_input_tensors(
             target=target,
             n_steps=n_steps,
@@ -188,14 +188,13 @@ def prepare_batched_input_tensors(
         )
 
         encoder_inputs.append(encoder_inp.squeeze(0))
-        steps_tensors.append(steps_tens.squeeze(0) if steps_tens is not None else None)
+        if steps_tens is not None:
+            steps_tensors.append(steps_tens.squeeze(0))
         path_starts.append(path_tens.squeeze(0))
         target_lengths.append(1074)
 
     encoder_batch = torch.stack(encoder_inputs)
-    steps_batch = (
-        torch.stack([s for s in steps_tensors if s is not None]) if all(s is not None for s in steps_tensors) else None
-    )
+    steps_batch = torch.stack(steps_tensors) if n_steps_list is not None else None
 
     return encoder_batch, steps_batch, path_starts, target_lengths
 
@@ -265,7 +264,7 @@ def generate_routes(
 
 def generate_routes_batched(
     targets: Sequence[str],
-    n_steps_list: Sequence[int | None],
+    n_steps_list: Sequence[int] | None,
     starting_materials: Sequence[str | None],
     beam_size: int,
     model: ModelName | torch.nn.Module,
@@ -278,7 +277,7 @@ def generate_routes_batched(
 
     Args:
         targets: List of SMILES strings of target molecules
-        n_steps_list: List of number of synthesis steps for each target (can contain None)
+        n_steps_list: List of number of synthesis steps for each target, or None if not using steps
         starting_materials: List of starting materials for each target (can contain None)
         beam_size: Beam size for the beam search
         model: Either a model name or a torch.nn.Module
@@ -293,7 +292,8 @@ def generate_routes_batched(
     if isinstance(model, str):
         if ckpt_dir is None:
             raise ValueError("ckpt_dir must be provided when model is specified by name")
-        for _target, n_steps, sm in zip(targets, n_steps_list, starting_materials, strict=False):
+        for i, (sm, _target) in enumerate(zip(starting_materials, targets, strict=False)):
+            n_steps = n_steps_list[i] if n_steps_list is not None else None
             validate_model_constraints(model, n_steps, sm)
         model = load_published_model(model, ckpt_dir, use_fp16)
 
