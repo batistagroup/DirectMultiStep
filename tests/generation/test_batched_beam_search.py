@@ -211,7 +211,7 @@ class TestBatchedVsOptimizedComparison:
         vec_results = vec_beam.decode(
             src_BC=encoder_inp,
             steps_B1=steps_tens,
-            path_starts=path_tens,
+            path_starts=[path_tens[0]],
             progress_bar=False,
         )
 
@@ -354,7 +354,7 @@ class TestBatchedVsOptimizedComparison:
             )
 
             batched_seqs = [seq for seq, _ in batched_results[idx]]
-            vec_seqs = [seq for seq, _ in vec_results]
+            vec_seqs = [seq for seq, _ in vec_results[idx]]
             optimized_seqs = [seq for seq, _ in optimized_results[0]]
 
             for beam_idx, (b_seq, v_seq, o_seq) in enumerate(zip(batched_seqs, vec_seqs, optimized_seqs, strict=False)):
