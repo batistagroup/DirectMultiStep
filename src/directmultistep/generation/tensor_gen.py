@@ -85,6 +85,9 @@ class VectorizedBatchedBeamSearch:
         L = self.max_length
         V = len(self.idx_to_token)
 
+        # Detect the dtype from input (or could check model.parameters())
+        dtype = src_BC.dtype
+
         # Encode source sequences once
         src_mask_B11C = (src_BC != self.pad_idx).unsqueeze(1).unsqueeze(2)
         enc_src_BCD = self.model.encoder(src_BC.long(), src_mask_B11C, steps_B1)
@@ -95,7 +98,7 @@ class VectorizedBatchedBeamSearch:
 
         # Initialize beam tensors
         sequences_BSL = torch.full((B, S, L), self.pad_idx, dtype=torch.long, device=self.device)
-        scores_BS = torch.full((B, S), float("-inf"), device=self.device)
+        scores_BS = torch.full((B, S), float("-inf"), dtype=dtype, device=self.device)
         scores_BS[:, 0] = 0.0
         active_BS = torch.ones((B, S), dtype=torch.bool, device=self.device)
 
@@ -120,7 +123,7 @@ class VectorizedBatchedBeamSearch:
         # beam_expand_indices = self.beam_indices.unsqueeze(0).expand(B, -1)
 
         # Pre-allocate candidate selection tensors
-        candidate_buffer = torch.zeros((B, S * S), device=self.device)
+        candidate_buffer = torch.zeros((B, S * S), device=self.device, dtype=dtype)
         beam_idx_buffer = torch.zeros((B, S * S), dtype=torch.long, device=self.device)
         token_idx_buffer = torch.zeros((B, S * S), dtype=torch.long, device=self.device)
 
@@ -189,7 +192,7 @@ class VectorizedBatchedBeamSearch:
             active_log_probs = torch.log_softmax(active_output[:, -1, :], dim=-1)
 
             # Scatter back to full tensor
-            log_probs_BSV = torch.full((B * S, active_log_probs.size(-1)), float("-inf"), device=self.device)
+            log_probs_BSV = torch.full((B * S, active_log_probs.size(-1)), float("-inf"), dtype=dtype, device=self.device)
             log_probs_BSV[active_indices] = active_log_probs
             log_probs_BSV = log_probs_BSV.view(B, S, -1)
 

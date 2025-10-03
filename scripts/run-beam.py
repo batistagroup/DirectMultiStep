@@ -62,29 +62,33 @@ def run_beam_hard() -> None:
 
     for beam in beams:
         print(f"Beam size: {beam}")
-        for target, sm, n_steps in tqdm(
-            zip(targets_list, sms_list, n_steps_list, strict=False), total=len(targets_list)
-        ):
-            generate_routes(
-                target=target,
-                n_steps=n_steps,
-                starting_material=sm,
+        for fp_16 in [False, True]:
+            print(f"Use fp16: {fp_16}")
+            for target, sm, n_steps in tqdm(
+                zip(targets_list, sms_list, n_steps_list, strict=False), total=len(targets_list)
+            ):
+                generate_routes(
+                    target=target,
+                    n_steps=n_steps,
+                    starting_material=sm,
+                    beam_size=beam,
+                    model="flash",
+                    config_path=Path("data/configs/dms_dictionary.yaml"),
+                    ckpt_dir=Path("data/checkpoints"),
+                    show_progress=False,
+                    use_fp16=fp_16
+                )
+
+            generate_routes_batched(
+                targets=targets_list,
+                n_steps_list=n_steps_list,
+                starting_materials=sms_list,
                 beam_size=beam,
                 model="flash",
                 config_path=Path("data/configs/dms_dictionary.yaml"),
                 ckpt_dir=Path("data/checkpoints"),
-                show_progress=False,
+                use_fp16=fp_16
             )
-
-        generate_routes_batched(
-            targets=targets_list,
-            n_steps_list=n_steps_list,
-            starting_materials=sms_list,
-            beam_size=beam,
-            model="flash",
-            config_path=Path("data/configs/dms_dictionary.yaml"),
-            ckpt_dir=Path("data/checkpoints"),
-        )
 
 
 if __name__ == "__main__":
