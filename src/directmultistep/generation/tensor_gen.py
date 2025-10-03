@@ -125,6 +125,9 @@ class VectorizedBatchedBeamSearch:
         beam_idx_buffer = torch.zeros((B, S * S), dtype=torch.long, device=self.device)
         token_idx_buffer = torch.zeros((B, S * S), dtype=torch.long, device=self.device)
 
+        # Pre-compute beam index patterns for candidate expansion
+        beam_idx_pattern = self.beam_indices.unsqueeze(1).expand(-1, S).reshape(-1)
+
         pbar: Iterable[int] = (
             tqdm(range(first_step, max_steps), desc="Beam search", dynamic_ncols=True)
             if progress_bar
@@ -217,8 +220,7 @@ class VectorizedBatchedBeamSearch:
 
             # Flatten active candidates into pre-allocated buffer
             candidate_buffer[:] = candidate_scores_BSS.view(B, S * S)
-            # Create beam indices for all candidates: each beam index repeated S times
-            beam_idx_buffer[:] = torch.arange(S, device=self.device).unsqueeze(1).expand(-1, S).reshape(1, -1).expand(B, -1)
+            beam_idx_buffer[:] = beam_idx_pattern.unsqueeze(0).expand(B, -1)
             token_idx_buffer[:] = top_k_tokens_BSS.view(B, S * S)
 
             # Optimization 7: Use scatter for inactive beams instead of concatenation
@@ -262,9 +264,8 @@ class VectorizedBatchedBeamSearch:
 
             # Add new tokens where applicable
             mask_add_token = selected_token_indices != -1
-            batch_coords, beam_coords = torch.where(mask_add_token)
-            if batch_coords.numel() > 0:
-                sequences_BSL[batch_coords, beam_coords, step] = selected_token_indices[batch_coords, beam_coords]
+            if mask_add_token.any():
+                sequences_BSL[mask_add_token, step] = selected_token_indices[mask_add_token]
 
             # Update active status
             has_end_in_selected = (selected_token_indices == self.end_idx) | \

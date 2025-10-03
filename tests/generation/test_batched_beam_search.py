@@ -393,6 +393,7 @@ class TestBatchedVsOptimizedComparison:
 
         torch.manual_seed(42)
         vec_beam.beam_size = 20
+        vec_beam._init_reusable_tensors()
         vec_results = vec_beam.decode(
             src_BC=encoder_batch.to(vec_beam.device),
             steps_B1=steps_batch.to(vec_beam.device) if steps_batch is not None else None,
@@ -456,6 +457,7 @@ class TestBatchedVsOptimizedComparison:
 
         torch.manual_seed(42)
         vec_beam.beam_size = 50
+        vec_beam._init_reusable_tensors()
         vec_results = vec_beam.decode(
             src_BC=encoder_batch.to(vec_beam.device),
             steps_B1=steps_batch.to(vec_beam.device) if steps_batch is not None else None,
