@@ -8,7 +8,7 @@ import numpy as np
 import pytest
 import torch
 
-from directmultistep.generation.tensor_gen import BeamSearchOptimized, VectorizedBatchedBeamSearch
+from directmultistep.generation.tensor_gen import BatchedBeamSearch, BeamSearchOptimized
 from directmultistep.utils.dataset import RoutesProcessing
 
 torch.manual_seed(42)
@@ -34,7 +34,7 @@ class TestBatchedBeamSearch:
         rds = RoutesProcessing(metadata_path=config_path)
 
         device = next(model.parameters()).device
-        beam_obj = VectorizedBatchedBeamSearch(
+        beam_obj = BatchedBeamSearch(
             model=model,
             beam_size=5,
             start_idx=0,
@@ -91,7 +91,7 @@ class TestBatchedVsOptimizedComparison:
             idx_to_token=rds.idx_to_token,
             device=device,
         )
-        vec_beam = VectorizedBatchedBeamSearch(
+        vec_beam = BatchedBeamSearch(
             model=model,
             beam_size=5,
             start_idx=0,

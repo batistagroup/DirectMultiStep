@@ -34,7 +34,7 @@ class BeamState:
     active: bool
 
 
-class VectorizedBatchedBeamSearch:
+class BatchedBeamSearch:
     def __init__(
         self,
         model: nn.Module,
@@ -59,7 +59,7 @@ class VectorizedBatchedBeamSearch:
         self._init_reusable_tensors()
 
     def __repr__(self) -> str:
-        return f"VectorizedBatchedBeamSearch(beam_size={self.beam_size}, max_length={self.max_length})"
+        return f"BatchedBeamSearch(beam_size={self.beam_size}, max_length={self.max_length})"
 
     def _init_reusable_tensors(self) -> None:
         """Pre-allocate tensors that can be reused across decode calls"""

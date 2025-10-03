@@ -5,8 +5,8 @@ from typing import Literal, cast
 import torch
 import torch.nn as nn
 
+from directmultistep.generation.tensor_gen import BatchedBeamSearch
 from directmultistep.generation.tensor_gen import BeamSearchOptimized as BeamSearch
-from directmultistep.generation.tensor_gen import VectorizedBatchedBeamSearch
 from directmultistep.model import ModelFactory
 from directmultistep.utils.dataset import RoutesProcessing
 from directmultistep.utils.post_process import find_valid_paths, process_path_single
@@ -75,13 +75,11 @@ def create_beam_search(model: torch.nn.Module, beam_size: int, rds: RoutesProces
     return beam
 
 
-def create_batched_beam_search(
-    model: torch.nn.Module, beam_size: int, rds: RoutesProcessing
-) -> VectorizedBatchedBeamSearch:
+def create_batched_beam_search(model: torch.nn.Module, beam_size: int, rds: RoutesProcessing) -> BatchedBeamSearch:
     """Create a batched beam search object that supports variable batch sizes and lengths."""
     device = next(model.parameters()).device
 
-    beam = VectorizedBatchedBeamSearch(
+    beam = BatchedBeamSearch(
         model=model,
         beam_size=beam_size,
         start_idx=0,
