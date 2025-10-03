@@ -430,7 +430,6 @@ class TestBatchedVsOptimizedComparison:
                     f"Vector: {v_seq}\nOptimized: {o_seq}"
                 )
 
-
     def test_multiple_batches_independently_correct_hard_beam50(self, model_components):
         """Test that batched decoding produces correct results for each batch item independently."""
         model, rds, batched_beam, optimized_beam, vec_beam = model_components
