@@ -115,7 +115,7 @@ class TestBatchedVsOptimizedComparison:
 
     def test_single_batch_equivalence(self, model_components):
         """Test that BatchedBeamSearch gives same results as BeamSearchOptimized for single batch."""
-        model, rds, batched_beam, optimized_beam, _ = model_components
+        model, rds, batched_beam, optimized_beam, vec_beam = model_components
 
         target = "CNCc1ccccc1"
         starting_material = None
@@ -146,27 +146,36 @@ class TestBatchedVsOptimizedComparison:
             path_starts=[path_tens[0]],
             progress_bar=True,
         )
+        vec_results = vec_beam.decode(
+            src_BC=encoder_inp,
+            steps_B1=steps_tens,
+            path_starts=[path_tens[0]],
+            progress_bar=True,
+        )
 
         assert len(batched_results) == 1
         assert len(optimized_results) == 1
+        assert len(vec_results) == 1
 
         batched_seqs = [seq for seq, _ in batched_results[0]]
         optimized_seqs = [seq for seq, _ in optimized_results[0]]
+        vec_seqs = [seq for seq, _ in vec_results[0]]
 
         batched_probs = [prob for _, prob in batched_results[0]]
         optimized_probs = [prob for _, prob in optimized_results[0]]
+        vec_probs = [prob for _, prob in vec_results[0]]
 
-        for i, (b_seq, o_seq) in enumerate(zip(batched_seqs, optimized_seqs, strict=False)):
-            assert b_seq == o_seq, f"Beam {i}: Sequence mismatch.\nBatched: {b_seq}\nOptimized: {o_seq}"
+        for i, (b_seq, o_seq, v_seq) in enumerate(zip(batched_seqs, optimized_seqs, vec_seqs, strict=False)):
+            assert b_seq == o_seq == v_seq, f"Beam {i}: Sequence mismatch.\nBatched: {b_seq}\nOptimized: {o_seq}\nVectorized: {v_seq}"
 
-        for i, (b_prob, o_prob) in enumerate(zip(batched_probs, optimized_probs, strict=False)):
-            assert abs(b_prob - o_prob) < 1e-5, (
-                f"Beam {i}: Log prob mismatch. Batched: {b_prob:.6f}, Optimized: {o_prob:.6f}"
+        for i, (b_prob, o_prob, v_prob) in enumerate(zip(batched_probs, optimized_probs, vec_probs, strict=False)):
+            assert abs(b_prob - o_prob) < 1e-5 and abs(b_prob - v_prob) < 1e-5, (
+                f"Beam {i}: Log prob mismatch. Batched: {b_prob:.6f}, Optimized: {o_prob:.6f}, Vectorized: {v_prob:.6f}"
             )
 
     def test_single_batch_equivalence_with_sm(self, model_components):
         """Test equivalence when starting material is provided."""
-        model, rds, batched_beam, optimized_beam, _ = model_components
+        model, rds, batched_beam, optimized_beam, vec_beam = model_components
 
         target = "CNCc1ccccc1"
         starting_material = "CN"
@@ -198,23 +207,33 @@ class TestBatchedVsOptimizedComparison:
             progress_bar=False,
         )
 
+        torch.manual_seed(42)
+        vec_results = vec_beam.decode(
+            src_BC=encoder_inp,
+            steps_B1=steps_tens,
+            path_start_BL=path_tens,
+            progress_bar=False,
+        )
+
         batched_seqs = [seq for seq, _ in batched_results[0]]
         optimized_seqs = [seq for seq, _ in optimized_results[0]]
+        vec_seqs = [seq for seq, _ in vec_results[0]]
 
         batched_probs = [prob for _, prob in batched_results[0]]
         optimized_probs = [prob for _, prob in optimized_results[0]]
+        vec_probs = [prob for _, prob in vec_results[0]]
 
-        for i, (b_seq, o_seq) in enumerate(zip(batched_seqs, optimized_seqs, strict=False)):
-            assert b_seq == o_seq, f"Beam {i}: Sequence mismatch.\nBatched: {b_seq}\nOptimized: {o_seq}"
+        for i, (b_seq, o_seq, v_seq) in enumerate(zip(batched_seqs, optimized_seqs, vec_seqs, strict=False)):
+            assert b_seq == o_seq == v_seq, f"Beam {i}: Sequence mismatch.\nBatched: {b_seq}\nOptimized: {o_seq}\nVectorized: {v_seq}"
 
-        for i, (b_prob, o_prob) in enumerate(zip(batched_probs, optimized_probs, strict=False)):
-            assert abs(b_prob - o_prob) < 1e-5, (
-                f"Beam {i}: Log prob mismatch. Batched: {b_prob:.6f}, Optimized: {o_prob:.6f}"
+        for i, (b_prob, o_prob, v_prob) in enumerate(zip(batched_probs, optimized_probs, vec_probs, strict=False)):
+            assert abs(b_prob - o_prob) < 1e-5 and abs(b_prob - v_prob) < 1e-5, (
+                f"Beam {i}: Log prob mismatch. Batched: {b_prob:.6f}, Optimized: {o_prob:.6f}, Vectorized: {v_prob:.6f}"
             )
 
     def test_multiple_batches_independently_correct(self, model_components):
         """Test that batched decoding produces correct results for each batch item independently."""
-        model, rds, batched_beam, optimized_beam, _ = model_components
+        model, rds, batched_beam, optimized_beam, vec_beam = model_components
 
         targets = ["CNCc1ccccc1", "CC(=O)OC1=CC=CC=C1C(=O)O"]
         n_steps_list = [1, 1]
@@ -238,6 +257,14 @@ class TestBatchedVsOptimizedComparison:
             progress_bar=True,
         )
 
+        torch.manual_seed(42)
+        vec_results = vec_beam.decode(
+            src_BC=encoder_batch.to(vec_beam.device),
+            steps_B1=steps_batch.to(vec_beam.device) if steps_batch is not None else None,
+            path_starts=[ps.to(vec_beam.device) for ps in path_starts],
+            progress_bar=True,
+        )
+
         from directmultistep.generate import prepare_input_tensors
 
         for idx, (target, n_steps) in enumerate(zip(targets, n_steps_list, strict=False)):
@@ -258,17 +285,18 @@ class TestBatchedVsOptimizedComparison:
             )
 
             batched_seqs = [seq for seq, _ in batched_results[idx]]
+            vec_seqs = [seq for seq, _ in vec_results[idx]]
             optimized_seqs = [seq for seq, _ in optimized_results[0]]
 
-            for beam_idx, (b_seq, o_seq) in enumerate(zip(batched_seqs, optimized_seqs, strict=False)):
-                assert b_seq == o_seq, (
+            for beam_idx, (b_seq, v_seq, o_seq) in enumerate(zip(batched_seqs, vec_seqs, optimized_seqs, strict=False)):
+                assert b_seq == v_seq == o_seq, (
                     f"Target {idx} ('{target}'), Beam {beam_idx}: Sequence mismatch.\n"
-                    f"Batched: {b_seq}\nOptimized: {o_seq}"
+                    f"Batched: {b_seq}\nVectorized: {v_seq}\nOptimized: {o_seq}"
                 )
 
     def test_multiple_batches_independently_correct_hard(self, model_components):
         """Test that batched decoding produces correct results for each batch item independently."""
-        model, rds, batched_beam, optimized_beam, _ = model_components
+        model, rds, batched_beam, optimized_beam, vec_beam = model_components
 
         targets_list = [
             "CC(=O)OC1=CC=CC=C1C(=O)O",
@@ -298,6 +326,14 @@ class TestBatchedVsOptimizedComparison:
             progress_bar=True,
         )
 
+        torch.manual_seed(42)
+        vec_results = vec_beam.decode(
+            src_BC=encoder_batch.to(vec_beam.device),
+            steps_B1=steps_batch.to(vec_beam.device) if steps_batch is not None else None,
+            path_starts=[ps.to(vec_beam.device) for ps in path_starts],
+            progress_bar=True,
+        )
+
         from directmultistep.generate import prepare_input_tensors
 
         for idx, (target, sm, n_steps) in enumerate(zip(targets_list, sms_list, n_steps_list, strict=False)):
@@ -318,12 +354,13 @@ class TestBatchedVsOptimizedComparison:
             )
 
             batched_seqs = [seq for seq, _ in batched_results[idx]]
+            vec_seqs = [seq for seq, _ in vec_results]
             optimized_seqs = [seq for seq, _ in optimized_results[0]]
 
-            for beam_idx, (b_seq, o_seq) in enumerate(zip(batched_seqs, optimized_seqs, strict=False)):
-                assert b_seq == o_seq, (
+            for beam_idx, (b_seq, v_seq, o_seq) in enumerate(zip(batched_seqs, vec_seqs, optimized_seqs, strict=False)):
+                assert b_seq == v_seq == o_seq, (
                     f"Target {idx} ('{target}'), Beam {beam_idx}: Sequence mismatch.\n"
-                    f"Batched: {b_seq}\nOptimized: {o_seq}"
+                    f"Batched: {b_seq}\nVector: {v_seq}\nOptimized: {o_seq}"
                 )
 
     def test_vector_non_vector(self, model_components):
@@ -365,9 +402,7 @@ class TestBatchedVsOptimizedComparison:
             progress_bar=True,
         )
 
-
         for idx, (target) in enumerate(targets_list):
-
             batched_seqs = [seq for seq, _ in batched_results[idx]]
             vec_seqs = [seq for seq, _ in vec_results[idx]]
 

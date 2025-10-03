@@ -68,13 +68,7 @@ class VectorizedBatchedBeamSearch:
         token_processor: Callable[[list[str]], str] | None = None,
     ) -> BeamSearchOutput:
         """
-        Vectorized beam search with minimal Python loops.
-
-        Key optimizations:
-        - All beam states stored in tensors (sequences_BSL, scores_BS, active_BS)
-        - Batch operations for beam expansion and selection
-        - Vectorized end token detection
-        - Single forward pass for all active beams
+        Vectorized beam search that exactly matches original behavior.
         """
         B, C = src_BC.shape
         S = self.beam_size
@@ -90,14 +84,16 @@ class VectorizedBatchedBeamSearch:
         scores_BS[:, 0] = 0.0  # First beam in each batch starts with score 0
         active_BS = torch.ones((B, S), dtype=torch.bool, device=self.device)
 
-        # Handle path starts efficiently with tensor operations
+        # Handle path starts
         first_steps_B = torch.ones(B, dtype=torch.long, device=self.device)
 
         if path_starts:
             for b, path in enumerate(path_starts):
                 if path is not None:
                     path_len = path.size(0)
-                    sequences_BSL[b, :, :path_len] = path.unsqueeze(0).expand(S, -1)
+                    # Only set path for all beams
+                    for s in range(S):
+                        sequences_BSL[b, s, :path_len] = path
                     first_steps_B[b] = path_len
                 else:
                     sequences_BSL[b, :, 0] = self.start_idx
@@ -107,9 +103,7 @@ class VectorizedBatchedBeamSearch:
         first_step = first_steps_B.min().item()
         max_steps = L - 1 if target_lengths is None else max(target_lengths)
 
-        # For efficient decoder batching
-        enc_src_expanded_BSCD = enc_src_BCD.unsqueeze(1).expand(-1, S, -1, -1)
-        src_mask_expanded_BS11C = src_mask_B11C.unsqueeze(1).expand(-1, S, -1, -1, -1)
+        batch_finished_B = torch.zeros(B, dtype=torch.bool, device=self.device)
 
         pbar: Iterable[int] = (
             tqdm(range(first_step, max_steps), desc="Beam search", dynamic_ncols=True)
@@ -118,143 +112,178 @@ class VectorizedBatchedBeamSearch:
         )
 
         for step in pbar:
-            # Check for end tokens using vectorized operations
-            end_mask_BSL = sequences_BSL == self.end_idx
-            has_ended_BS = end_mask_BSL[:, :, :step].any(dim=-1)
-            active_BS = active_BS & ~has_ended_BS
-
-            # Check if any batch is still active
-            batch_active_B = active_BS.any(dim=1)
-            if not batch_active_B.any():
+            if batch_finished_B.all():
                 break
 
-            # Create mask for batches that have started decoding
+            # Check which batches have started decoding
             step_active_B = step >= first_steps_B
-            active_mask_BS = active_BS & step_active_B.unsqueeze(1)
 
-            if not active_mask_BS.any():
+            # Check for end tokens in sequences up to current position
+            # This matches the original: checking if sequence already contains end token
+            for b in range(B):
+                if batch_finished_B[b] or not step_active_B[b]:
+                    continue
+
+                for s in range(S):
+                    if active_BS[b, s]:
+                        # Check if sequence already contains end token up to step
+                        if (sequences_BSL[b, s, :step] == self.end_idx).any():
+                            active_BS[b, s] = False
+
+                # Check if all beams for this batch are inactive
+                if not active_BS[b].any():
+                    batch_finished_B[b] = True
+
+            if progress_bar and batch_finished_B.any():
+                finished_count = batch_finished_B.sum().item()
+                pbar.set_postfix({"Finished batches": f"{finished_count}/{B}"})
+
+            # Collect active beams for forward pass
+            active_sequences = []
+            active_indices = []  # (batch_idx, beam_idx) pairs
+
+            for b in range(B):
+                if batch_finished_B[b] or not step_active_B[b]:
+                    continue
+
+                for s in range(S):
+                    if active_BS[b, s]:
+                        active_sequences.append(sequences_BSL[b, s, :step])
+                        active_indices.append((b, s))
+
+            if not active_sequences:
                 continue
 
-            # Get active sequences for forward pass
-            active_count = active_mask_BS.sum().item()
-            active_sequences = sequences_BSL[active_mask_BS][:, :step]
+            # Batch forward pass
+            active_sequences_tensor = torch.stack(active_sequences, dim=0)
 
-            # Prepare encoder outputs for active beams
-            active_enc = enc_src_expanded_BSCD.reshape(B * S, -1, enc_src_BCD.size(-1))[active_mask_BS.reshape(-1)]
-            active_src_mask = src_mask_expanded_BS11C.reshape(B * S, 1, 1, -1)[active_mask_BS.reshape(-1)]
+            # Expand encoder outputs for active beams
+            enc_expanded = []
+            src_mask_expanded = []
 
-            # Single forward pass for all active beams
+            for b, s in active_indices:
+                enc_expanded.append(enc_src_BCD[b : b + 1])
+                src_mask_expanded.append(src_mask_B11C[b : b + 1])
+
+            enc_expanded = torch.cat(enc_expanded, dim=0)
+            src_mask_expanded = torch.cat(src_mask_expanded, dim=0)
+
+            # Get predictions
             with torch.no_grad():
                 output = self.model.decoder(
-                    trg_BL=active_sequences,
-                    enc_src_BCD=active_enc,
-                    src_mask_B11C=active_src_mask,
+                    trg_BL=active_sequences_tensor,
+                    enc_src_BCD=enc_expanded,
+                    src_mask_B11C=src_mask_expanded,
                     trg_mask_B1LL=None,
                 )
 
             log_probs = torch.log_softmax(output[:, -1, :], dim=-1)
 
-            # Expand beams: for each active beam, get top S tokens
-            # This creates up to S*S candidates per batch
-            top_k_log_probs, top_k_indices = torch.topk(log_probs, k=S, dim=-1)
+            # Process predictions for each batch
+            # We need to create candidate lists per batch to match original behavior
+            batch_candidates = [[] for _ in range(B)]
 
-            # Initialize candidate tensors
-            V = log_probs.size(-1)  # vocab size
-            candidate_seqs_BSL = sequences_BSL.unsqueeze(2).expand(-1, -1, S, -1).clone()
-            candidate_scores_BSS = torch.full((B, S, S), float("-inf"), device=self.device)
-
-            # Fill in candidates using advanced indexing
-            active_batch_idx, active_beam_idx = torch.where(active_mask_BS)
-
-            # Vectorized candidate creation
-            # Determine which beams should expand
+            active_idx = 0
             for b in range(B):
-                # Check if this batch is at its first decoding step
-                at_first_step = (step == first_steps_B[b])
-                
+                if batch_finished_B[b] or not step_active_B[b]:
+                    continue
+
                 for s in range(S):
-                    # Skip beams that are not active for this step
-                    if not active_mask_BS[b, s]:
-                        # Inactive beams with valid scores should be kept as candidates
+                    if not active_BS[b, s]:
+                        # Keep finished beams as candidates with their final scores
+                        # Only if they have valid scores (not initial -inf)
                         if scores_BS[b, s] > float("-inf"):
-                            candidate_seqs_BSL[b, s, 0] = sequences_BSL[b, s]
-                            candidate_scores_BSS[b, s, 0] = scores_BS[b, s]
+                            batch_candidates[b].append(
+                                (
+                                    sequences_BSL[b, s].clone(),
+                                    scores_BS[b, s].item(),
+                                    False,  # already finished
+                                )
+                            )
                         continue
-                    
-                    # At first step, only beam 0 should expand
-                    if at_first_step and s > 0:
+
+                    # Get log probs for this beam
+                    beam_log_probs = log_probs[active_idx]
+                    active_idx += 1
+
+                    # For first real decoding step of this batch, only expand from first beam
+                    if step == first_steps_B[b] and s > 0:
                         continue
-                    
-                    # Find the index in the log_probs tensor for this beam
-                    # Count how many active beams come before this one
-                    mask_before = active_mask_BS[:b, :].sum() + active_mask_BS[b, :s].sum()
-                    log_probs_idx = mask_before.item()
-                    
-                    # Update candidate sequences and scores
-                    candidate_seqs_BSL[b, s, :, step] = top_k_indices[log_probs_idx]
-                    candidate_scores_BSS[b, s, :] = scores_BS[b, s] + top_k_log_probs[log_probs_idx]
 
-            # Reshape candidates for selection (B, S*S)
-            candidate_seqs_flat = candidate_seqs_BSL.reshape(B, S * S, L)
-            candidate_scores_flat = candidate_scores_BSS.reshape(B, S * S)
+                    # Determine k value
+                    if step == first_steps_B[b]:
+                        k = S  # First decoding step: take top S tokens
+                    else:
+                        k = S  # Later steps: take top S tokens per beam
 
-            # Normalize scores by length (vectorized)
-            seq_lengths = (candidate_seqs_flat != self.pad_idx).sum(dim=-1).float()
-            normalized_scores = candidate_scores_flat / (seq_lengths.sqrt() + 1e-6)
+                    top_log_probs, top_indices = torch.topk(beam_log_probs, k=min(k, beam_log_probs.size(0)))
+
+                    # Create candidate sequences
+                    for token_log_prob, token_idx in zip(top_log_probs, top_indices, strict=False):
+                        new_seq = sequences_BSL[b, s].clone()
+                        new_seq[step] = token_idx
+                        new_score = scores_BS[b, s].item() + token_log_prob.item()
+
+                        # Check if sequence is finished
+                        is_finished = (token_idx == self.end_idx).item() or (
+                            new_seq[:step] == self.end_idx
+                        ).any().item()
+
+                        batch_candidates[b].append((new_seq, new_score, is_finished))
 
             # Select top S beams per batch
-            # Use masked fill to handle -inf scores
-            normalized_scores = normalized_scores.masked_fill(candidate_scores_flat == float("-inf"), float("-inf"))
+            for b in range(B):
+                if batch_finished_B[b] or not step_active_B[b]:
+                    continue
 
-            top_scores, top_indices = torch.topk(normalized_scores, k=S, dim=1, largest=True, sorted=True)
+                if not batch_candidates[b]:
+                    continue
 
-            # Update beam states using gather
-            batch_indices = torch.arange(B, device=self.device).unsqueeze(1).expand(-1, S)
-            sequences_BSL = candidate_seqs_flat[batch_indices, top_indices]
-            scores_BS = candidate_scores_flat[batch_indices, top_indices]
+                # Normalize scores and select top S
+                normalized_candidates = []
+                for seq, score, is_finished in batch_candidates[b]:
+                    # Calculate actual sequence length (excluding padding)
+                    seq_len = (seq != self.pad_idx).sum().float()
+                    # Normalize by square root of length
+                    normalized_score = score / (seq_len.sqrt() + 1e-6)
+                    normalized_candidates.append((seq, score, normalized_score, is_finished))
 
-            # Update active status
-            active_BS = scores_BS > float("-inf")
-            end_tokens_in_seq = (sequences_BSL == self.end_idx).any(dim=-1)
-            active_BS = active_BS & ~end_tokens_in_seq
+                # Sort by normalized score and keep top S
+                normalized_candidates.sort(key=lambda x: x[2], reverse=True)
+                top_candidates = normalized_candidates[:S]
 
-            if progress_bar:
-                finished_count = (~batch_active_B).sum().item()
-                pbar.set_postfix({"Finished batches": f"{finished_count}/{B}"})
+                # Update beams for this batch
+                for s, (seq, score, _, is_finished) in enumerate(top_candidates):
+                    sequences_BSL[b, s] = seq
+                    scores_BS[b, s] = score
+                    active_BS[b, s] = not is_finished
 
-        # Extract final results (this part still needs some Python loops for string conversion)
+        # Extract final results
         outputs_BS2_nt: list[list[tuple[str, float]]] = []
 
         for b in range(B):
             batch_results = []
             for s in range(S):
-                # Skip invalid beams
+                # Skip beams with invalid scores
                 if scores_BS[b, s] == float("-inf"):
                     continue
 
-                # Extract sequence up to padding/end token
-                seq = sequences_BSL[b, s]
+                # Convert sequence to tokens
+                output_tokens = []
+                for idx in sequences_BSL[b, s]:
+                    if idx == self.pad_idx:
+                        break
+                    if idx == self.start_idx:
+                        continue
+                    if idx == self.end_idx:
+                        break
+                    output_tokens.append(self.idx_to_token[idx.item()])
 
-                # Find actual sequence length
-                pad_mask = seq == self.pad_idx
-                end_mask = seq == self.end_idx
-                start_mask = seq == self.start_idx
-
-                # Get valid token indices
-                valid_mask = ~(pad_mask | end_mask | start_mask)
-                valid_indices = torch.where(valid_mask)[0]
-
-                if len(valid_indices) == 0:
-                    output_str = ""
-                else:
-                    # Convert to tokens
-                    output_tokens = [self.idx_to_token[seq[i].item()] for i in valid_indices]
-                    output_str = token_processor(output_tokens) if token_processor else "".join(output_tokens)
+                # Process tokens into string
+                output_str = token_processor(output_tokens) if token_processor else "".join(output_tokens)
 
                 batch_results.append((output_str, scores_BS[b, s].item()))
 
-            # Sort by score
-            batch_results.sort(key=lambda x: x[1], reverse=True)
             outputs_BS2_nt.append(batch_results)
 
         return outputs_BS2_nt
