@@ -116,11 +116,12 @@ def prepare_input_tensors(
             - steps_tens: Tensor of the number of steps, or None if not provided.
             - path_tens: Initial path tensor for the decoder.
     """
-    prod_tens = rds.smile_to_tokens(target, product_max_length)
     if starting_material:
+        prod_tens = rds.smile_to_tokens(target, product_max_length)
         sm_tens = rds.smile_to_tokens(starting_material, sm_max_length)
         encoder_inp = torch.cat([prod_tens, sm_tens], dim=0).unsqueeze(0)
     else:
+        prod_tens = rds.smile_to_tokens(target, product_max_length + sm_max_length)
         encoder_inp = torch.cat([prod_tens], dim=0).unsqueeze(0)
 
     steps_tens = torch.tensor([n_steps]).unsqueeze(0) if n_steps is not None else None
