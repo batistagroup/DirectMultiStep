@@ -61,7 +61,7 @@ class VectorizedBatchedBeamSearch:
     def __repr__(self) -> str:
         return f"VectorizedBatchedBeamSearch(beam_size={self.beam_size}, max_length={self.max_length})"
 
-    def _init_reusable_tensors(self):
+    def _init_reusable_tensors(self) -> None:
         """Pre-allocate tensors that can be reused across decode calls"""
         S = self.beam_size
         # Pre-compute beam indices for gather operations
@@ -83,7 +83,7 @@ class VectorizedBatchedBeamSearch:
         B, C = src_BC.shape
         S = self.beam_size
         L = self.max_length
-        V = len(self.idx_to_token)
+        # V = len(self.idx_to_token)
 
         # Detect the dtype from input (or could check model.parameters())
         dtype = src_BC.dtype
@@ -115,7 +115,7 @@ class VectorizedBatchedBeamSearch:
         else:
             sequences_BSL[:, :, 0] = self.start_idx
 
-        first_step = first_steps_B.min().item()
+        first_step = int(first_steps_B.min().item())
         max_steps = L - 1 if target_lengths is None else max(target_lengths)
 
         # Pre-allocate reusable tensors for the loop
@@ -138,7 +138,6 @@ class VectorizedBatchedBeamSearch:
         # OPTIMIZATION: Pre-compute beam patterns once (outside loop ideally)
         beam_idx_pattern = torch.arange(S, device=self.device).unsqueeze(1).expand(S, S).reshape(-1)
 
-
         for step in pbar:
             # Check which batches have started decoding
             step_active_B = step >= first_steps_B
@@ -155,7 +154,7 @@ class VectorizedBatchedBeamSearch:
 
             if progress_bar and batch_finished_B.any():
                 finished_count = batch_finished_B.sum().item()
-                pbar.set_postfix({"Finished batches": f"{finished_count}/{B}"})
+                pbar.set_postfix({"Finished batches": f"{finished_count}/{B}"})  # type: ignore
 
             # Create mask for active beams
             active_mask_BS = active_BS & step_active_B.unsqueeze(1)
@@ -192,12 +191,14 @@ class VectorizedBatchedBeamSearch:
             active_log_probs = torch.log_softmax(active_output[:, -1, :], dim=-1)
 
             # Scatter back to full tensor
-            log_probs_BSV = torch.full((B * S, active_log_probs.size(-1)), float("-inf"), dtype=dtype, device=self.device)
+            log_probs_BSV = torch.full(
+                (B * S, active_log_probs.size(-1)), float("-inf"), dtype=dtype, device=self.device
+            )
             log_probs_BSV[active_indices] = active_log_probs
             log_probs_BSV = log_probs_BSV.view(B, S, -1)
 
             # Create expansion mask for first step logic
-            is_first_step_B = (step == first_steps_B)
+            is_first_step_B = first_steps_B == step
             expand_mask_BS = torch.ones((B, S), dtype=torch.bool, device=self.device)
             expand_mask_BS[is_first_step_B, 1:] = False
 
@@ -230,23 +231,29 @@ class VectorizedBatchedBeamSearch:
 
             # OPTIMIZATION: Use pre-allocated tensors and efficient concatenation
             n_candidates = S * S
-            all_scores = torch.cat([candidate_buffer,
-                                   torch.where(inactive_mask_BS, scores_BS, torch.tensor(float("-inf"), device=self.device))], dim=1)
+            all_scores = torch.cat(
+                [
+                    candidate_buffer,
+                    torch.where(inactive_mask_BS, scores_BS, torch.tensor(float("-inf"), device=self.device)),
+                ],
+                dim=1,
+            )
 
-            all_beam_indices = torch.cat([beam_idx_buffer,
-                                           torch.arange(S, device=self.device).unsqueeze(0).expand(B, -1)], dim=1)
+            all_beam_indices = torch.cat(
+                [beam_idx_buffer, torch.arange(S, device=self.device).unsqueeze(0).expand(B, -1)], dim=1
+            )
 
-            all_token_indices = torch.cat([token_idx_buffer,
-                                            torch.full((B, S), -1, dtype=torch.long, device=self.device)], dim=1)
+            all_token_indices = torch.cat(
+                [token_idx_buffer, torch.full((B, S), -1, dtype=torch.long, device=self.device)], dim=1
+            )
 
             # Compute sequence lengths for normalization
             seq_lengths_BS = (sequences_BSL != self.pad_idx).sum(dim=-1).float()
 
             # OPTIMIZATION: More efficient length computation
-            all_seq_lengths = torch.cat([
-                seq_lengths_BS.unsqueeze(-1).expand(B, S, S).reshape(B, n_candidates) + 1,
-                seq_lengths_BS
-            ], dim=1)
+            all_seq_lengths = torch.cat(
+                [seq_lengths_BS.unsqueeze(-1).expand(B, S, S).reshape(B, n_candidates) + 1, seq_lengths_BS], dim=1
+            )
 
             # Normalize
             normalized_scores = all_scores / (all_seq_lengths.sqrt() + 1e-6)
@@ -270,8 +277,9 @@ class VectorizedBatchedBeamSearch:
                 sequences_BSL[batch_coords, beam_coords, step] = selected_token_indices[batch_coords, beam_coords]
 
             # Update active status
-            has_end_in_selected = (selected_token_indices == self.end_idx) | \
-                                 (sequences_BSL[:, :, :step] == self.end_idx).any(dim=2)
+            has_end_in_selected = (selected_token_indices == self.end_idx) | (
+                sequences_BSL[:, :, :step] == self.end_idx
+            ).any(dim=2)
             was_inactive = selected_token_indices == -1
 
             # Update all states

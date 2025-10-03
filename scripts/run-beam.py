@@ -76,7 +76,7 @@ def run_beam_hard() -> None:
                     config_path=Path("data/configs/dms_dictionary.yaml"),
                     ckpt_dir=Path("data/checkpoints"),
                     show_progress=False,
-                    use_fp16=fp_16
+                    use_fp16=fp_16,
                 )
 
             generate_routes_batched(
@@ -87,7 +87,7 @@ def run_beam_hard() -> None:
                 model="flash",
                 config_path=Path("data/configs/dms_dictionary.yaml"),
                 ckpt_dir=Path("data/checkpoints"),
-                use_fp16=fp_16
+                use_fp16=fp_16,
             )
 
 
