@@ -211,7 +211,7 @@ class TestBatchedVsOptimizedComparison:
         vec_results = vec_beam.decode(
             src_BC=encoder_inp,
             steps_B1=steps_tens,
-            path_start_BL=path_tens,
+            path_starts=path_tens,
             progress_bar=False,
         )
 
