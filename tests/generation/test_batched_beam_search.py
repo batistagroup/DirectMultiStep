@@ -60,8 +60,6 @@ class TestBatchedBeamSearch:
         assert isinstance(beam_obj.device, torch.device)
 
 
-
-
 class TestBatchedVsOptimizedComparison:
     """Test that BatchedBeamSearch produces same results as BeamSearchOptimized for single batch."""
 
@@ -138,7 +136,6 @@ class TestBatchedVsOptimizedComparison:
             path_starts=[path_tens[0]],
             progress_bar=True,
         )
-
 
         assert len(batched_results) == 1
         assert len(optimized_results) == 1

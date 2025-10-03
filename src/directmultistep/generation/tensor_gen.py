@@ -16,7 +16,6 @@ K: size of each attention key or value (sometimes called d_kv)
 
 from collections.abc import Callable, Iterable
 from dataclasses import dataclass
-from typing import Any
 
 import torch
 import torch.nn as nn
@@ -90,11 +89,21 @@ class BatchedBeamSearch:
         src_mask_B11C = (src_BC != self.pad_idx).unsqueeze(1).unsqueeze(2)
         enc_src_BCD = self.model.encoder(src_BC.long(), src_mask_B11C, steps_B1)
 
-        # Initialize beams for each batch item
-        # Each batch item maintains S beams independently
+        # Initialize beams for each batch item and track first_step per batch
         batch_beams = []
+        batch_first_steps = []
+
         for b in range(B):
             beams = []
+
+            # Determine first step for this batch
+            if path_starts and path_starts[b] is not None:
+                path_len = path_starts[b].size(0)
+                first_step_b = path_len
+            else:
+                first_step_b = 1
+            batch_first_steps.append(first_step_b)
+
             for s in range(S):
                 beam = BeamState(
                     sequence=torch.full((L,), self.pad_idx, dtype=torch.long, device=self.device),
@@ -104,18 +113,18 @@ class BatchedBeamSearch:
 
                 # Set initial tokens
                 if path_starts and path_starts[b] is not None:
-                    path_len = path_starts[b].size(0)
                     beam.sequence[:path_len] = path_starts[b]
-                    first_step = path_len
                 else:
                     beam.sequence[0] = self.start_idx
-                    first_step = 1
 
                 beams.append(beam)
             batch_beams.append(beams)
 
         # Track which batches are completely finished
         batch_finished = [False] * B
+
+        # Determine starting step (minimum of all batch first steps)
+        first_step = min(batch_first_steps)
 
         # Determine max steps
         max_steps = L - 1
@@ -132,10 +141,14 @@ class BatchedBeamSearch:
                 break
 
             # First, check all beams for end tokens in their sequences
-            # This ensures beams that found end token in previous steps are marked inactive
             for b in range(B):
                 if batch_finished[b]:
                     continue
+
+                # Skip this batch if we haven't reached its first real decoding step yet
+                if step < batch_first_steps[b]:
+                    continue
+
                 all_inactive = True
                 for beam in batch_beams[b]:
                     if beam.active:
@@ -148,6 +161,9 @@ class BatchedBeamSearch:
                 # If all beams for this batch are inactive, mark batch as finished
                 if all_inactive:
                     batch_finished[b] = True
+                    if progress_bar:
+                        finished_count = sum(batch_finished)
+                        pbar.set_postfix({'Finished batches': f'{finished_count}/{B}'})
 
             # Collect all active beams across batches for efficient forward pass
             active_sequences = []
@@ -157,17 +173,20 @@ class BatchedBeamSearch:
                 if batch_finished[b]:
                     continue
 
+                # Skip if this batch hasn't started decoding yet
+                if step < batch_first_steps[b]:
+                    continue
+
                 for s, beam in enumerate(batch_beams[b]):
                     if beam.active:
                         active_sequences.append(beam.sequence[:step])
                         active_indices.append((b, s))
 
             if not active_sequences:
-                break
+                continue
 
             # Batch forward pass for all active beams
             active_sequences_tensor = torch.stack(active_sequences, dim=0)
-            num_active = len(active_sequences)
 
             # Expand encoder outputs for active beams
             enc_expanded = []
@@ -197,6 +216,10 @@ class BatchedBeamSearch:
                 if batch_finished[b]:
                     continue
 
+                # Skip if this batch hasn't started decoding yet
+                if step < batch_first_steps[b]:
+                    continue
+
                 # Collect candidates for this batch
                 candidates = []
 
@@ -210,13 +233,13 @@ class BatchedBeamSearch:
                     beam_log_probs = log_probs[active_idx]
                     active_idx += 1
 
-                    # For first real step, only expand from first beam
-                    if step == first_step and s > 0:
+                    # For first real decoding step of this batch, only expand from first beam
+                    if step == batch_first_steps[b] and s > 0:
                         continue
 
                     # Get top K tokens
-                    if step == first_step:
-                        # First step: take top S tokens
+                    if step == batch_first_steps[b]:
+                        # First decoding step for this batch: take top S tokens
                         k = S
                     else:
                         # Later steps: take top S tokens per beam
@@ -230,7 +253,7 @@ class BatchedBeamSearch:
                         new_seq[step] = token_idx
                         new_score = beam.score + token_log_prob.item()
 
-                        # Check if sequence is finished (either new token is end or sequence already has end)
+                        # Check if sequence is finished
                         is_finished = (token_idx == self.end_idx) or torch.any(new_seq[:step] == self.end_idx).item()
 
                         candidates.append((new_seq, new_score, is_finished))
@@ -240,7 +263,7 @@ class BatchedBeamSearch:
                 for seq, score, is_finished in candidates:
                     # Calculate actual sequence length (excluding padding)
                     seq_len = (seq != self.pad_idx).sum().float()
-                    # Normalize by square root of length (following the original implementation)
+                    # Normalize by square root of length
                     normalized_score = score / (seq_len.sqrt() + 1e-6)
                     normalized_candidates.append((seq, score, normalized_score, is_finished))
 
@@ -352,7 +375,9 @@ class BeamSearchOptimized:
         logger.info(
             f"Generating routes with beam size {S}. The progress bar may end early if all beams find end token."
         )
-        pbar: Iterable[int] = tqdm(range(first_step, L - 1), dynamic_ncols=True) if progress_bar else range(first_step, L - 1)
+        pbar: Iterable[int] = (
+            tqdm(range(first_step, L - 1), dynamic_ncols=True) if progress_bar else range(first_step, L - 1)
+        )
         for step in pbar:
             with torch.no_grad():
                 output_WLV = self.model.decoder(

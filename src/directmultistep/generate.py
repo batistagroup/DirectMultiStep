@@ -146,7 +146,7 @@ def prepare_batched_input_tensors(
     use_fp16: bool = False,
 ) -> tuple[torch.Tensor, torch.Tensor | None, list[torch.Tensor], list[int]]:
     """Prepare batched input tensors for the model.
-    
+
     Args:
         targets: List of SMILES strings of target molecules
         n_steps_list: List of number of synthesis steps for each target (can contain None)
@@ -155,7 +155,7 @@ def prepare_batched_input_tensors(
         product_max_length: Maximum length of the product SMILES sequence
         sm_max_length: Maximum length of the starting material SMILES sequence
         use_fp16: Whether to use half precision (FP16) for tensors
-        
+
     Returns:
         A tuple containing:
             - encoder_batch: Batched input tensor for the encoder [B, C]
@@ -168,12 +168,12 @@ def prepare_batched_input_tensors(
             f"Length mismatch: targets={len(targets)}, "
             f"n_steps_list={len(n_steps_list)}, starting_materials={len(starting_materials)}"
         )
-    
+
     encoder_inputs = []
     steps_tensors = []
     path_starts = []
     target_lengths = []
-    
+
     for target, n_steps, sm in zip(targets, n_steps_list, starting_materials, strict=False):
         encoder_inp, steps_tens, path_tens = prepare_input_tensors(
             target=target,
@@ -184,19 +184,17 @@ def prepare_batched_input_tensors(
             sm_max_length=sm_max_length,
             use_fp16=use_fp16,
         )
-        
+
         encoder_inputs.append(encoder_inp.squeeze(0))
         steps_tensors.append(steps_tens.squeeze(0) if steps_tens is not None else None)
         path_starts.append(path_tens.squeeze(0))
         target_lengths.append(1074)
-    
+
     encoder_batch = torch.stack(encoder_inputs)
     steps_batch = (
-        torch.stack([s for s in steps_tensors if s is not None])
-        if all(s is not None for s in steps_tensors)
-        else None
+        torch.stack([s for s in steps_tensors if s is not None]) if all(s is not None for s in steps_tensors) else None
     )
-    
+
     return encoder_batch, steps_batch, path_starts, target_lengths
 
 

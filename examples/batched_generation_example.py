@@ -15,7 +15,7 @@ ckpt_dir = Path("data/checkpoints")
 
 targets = [
     "CNCc1ccccc1",
-    "CCOc1ccccc1", 
+    "CCOc1ccccc1",
     "c1ccccc1",
 ]
 
@@ -37,8 +37,8 @@ routes = generate_routes_batched(
     ckpt_dir=ckpt_dir,
 )
 
-for i, (target, routes_for_target) in enumerate(zip(targets, routes)):
-    print(f"\nTarget {i+1}: {target}")
+for i, (target, routes_for_target) in enumerate(zip(targets, routes, strict=False)):
+    print(f"\nTarget {i + 1}: {target}")
     print(f"Starting material: {starting_materials[i]}")
     print(f"Number of steps: {n_steps_list[i]}")
     print(f"Generated {len(routes_for_target)} valid routes:")
