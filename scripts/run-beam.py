@@ -47,14 +47,14 @@ def run_beam2() -> None:
 
 
 def run_beam_hard() -> None:
-    targets_list = 4 * [
+    targets_list = [
         "CC(=O)OC1=CC=CC=C1C(=O)O",
         "CNCc1cc(-c2ccccc2F)n(S(=O)(=O)c2cccnc2)c1",
         "O=C(c1ccc(NS(=O)(=O)c2cccc3cccnc23)cc1)N1CCN(CC2CC2)CC1",
         "COc1ccc(-n2nccn2)c(C(=O)N2CCC[C@@]2(C)c2nc3c(C)c(Cl)ccc3[nH]2)c1",
     ]
-    sms_list = 4 * [None, "O=S(=O)(Cl)c1cccnc1", "CCOC(=O)c1ccc(N)cc1", "C[C@@]1(C(=O)O)CCCN1"]
-    n_steps_list = 4 * [1, 2, 5, 4]
+    sms_list = [None, "O=S(=O)(Cl)c1cccnc1", "CCOC(=O)c1ccc(N)cc1", "C[C@@]1(C(=O)O)CCCN1"]
+    n_steps_list = [1, 2, 5, 4]
 
     routes = generate_routes_batched(
         targets=targets_list,
@@ -68,7 +68,7 @@ def run_beam_hard() -> None:
     from tqdm import tqdm
 
     for target, sm, n_steps in tqdm(zip(targets_list, sms_list, n_steps_list, strict=False), total=len(targets_list)):
-        generate_routes(
+        old_routes = generate_routes(
             target=target,
             n_steps=n_steps,
             starting_material=sm,
@@ -85,6 +85,22 @@ def run_beam_hard() -> None:
             f.write(f"Routes: {len(routes_for_target)}\n")
             for route in routes_for_target[:3]:
                 f.write(route + "\n")
+    with open('b1-routes.txt', 'w') as f:
+        for i, (target, routes_for_target) in enumerate(zip(targets_list, old_routes, strict=False)):
+            f.write(f"Target {i + 1}: {target}\n")
+            f.write(f"Routes: {len(routes_for_target)}\n")
+            for route in routes_for_target[:3]:
+                f.write(route + "\n")
+
+    routes = generate_routes_batched(
+        targets=targets_list * 16,
+        n_steps_list=n_steps_list * 16,
+        starting_materials=sms_list * 16,
+        beam_size=5,
+        model="flash",
+        config_path=Path("data/configs/dms_dictionary.yaml"),
+        ckpt_dir=Path("data/checkpoints"),
+    )
 
 
 if __name__ == "__main__":
