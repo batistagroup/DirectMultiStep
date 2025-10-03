@@ -367,7 +367,7 @@ class TestBatchedVsOptimizedComparison:
                     f"Batched: {b_seq}\nVector: {v_seq}\nOptimized: {o_seq}"
                 )
 
-    def test_vector_non_vector(self, model_components):
+    def test_multiple_batches_independently_correct_hard_beam20(self, model_components):
         """Test that batched decoding produces correct results for each batch item independently."""
         model, rds, batched_beam, optimized_beam, vec_beam = model_components
 
@@ -392,14 +392,6 @@ class TestBatchedVsOptimizedComparison:
         )
 
         torch.manual_seed(42)
-        batched_beam.beam_size = 20
-        batched_results = batched_beam.decode(
-            src_BC=encoder_batch.to(batched_beam.device),
-            steps_B1=steps_batch.to(batched_beam.device) if steps_batch is not None else None,
-            path_starts=[ps.to(batched_beam.device) for ps in path_starts],
-            progress_bar=True,
-        )
-
         vec_beam.beam_size = 20
         vec_results = vec_beam.decode(
             src_BC=encoder_batch.to(vec_beam.device),
@@ -408,12 +400,31 @@ class TestBatchedVsOptimizedComparison:
             progress_bar=True,
         )
 
-        for idx, (target) in enumerate(targets_list):
-            batched_seqs = [seq for seq, _ in batched_results[idx]]
-            vec_seqs = [seq for seq, _ in vec_results[idx]]
+        from directmultistep.generate import prepare_input_tensors
 
-            for beam_idx, (b_seq, v_seq) in enumerate(zip(batched_seqs, vec_seqs, strict=False)):
-                assert b_seq == v_seq, (
+        for idx, (target, sm, n_steps) in enumerate(zip(targets_list, sms_list, n_steps_list, strict=False)):
+            encoder_inp, steps_tens, path_tens = prepare_input_tensors(
+                target, n_steps, sm, rds, rds.product_max_length, rds.sm_max_length
+            )
+
+            encoder_inp = encoder_inp.to(optimized_beam.device)
+            steps_tens = steps_tens.to(optimized_beam.device) if steps_tens is not None else None
+            path_tens = path_tens.to(optimized_beam.device)
+
+            torch.manual_seed(42)
+            optimized_beam.beam_size = 20
+            optimized_results = optimized_beam.decode(
+                src_BC=encoder_inp,
+                steps_B1=steps_tens,
+                path_start_BL=path_tens,
+                progress_bar=True,
+            )
+
+            vec_seqs = [seq for seq, _ in vec_results[idx]]
+            optimized_seqs = [seq for seq, _ in optimized_results[0]]
+
+            for beam_idx, (v_seq, o_seq) in enumerate(zip(vec_seqs, optimized_seqs, strict=False)):
+                assert v_seq == o_seq, (
                     f"Target {idx} ('{target}'), Beam {beam_idx}: Sequence mismatch.\n"
-                    f"Batched: {b_seq}\nVectorized: {v_seq}"
+                    f"Vector: {v_seq}\nOptimized: {o_seq}"
                 )
