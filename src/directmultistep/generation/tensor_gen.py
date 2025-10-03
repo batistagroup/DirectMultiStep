@@ -159,7 +159,7 @@ class BatchedBeamSearch:
             top_k_log_probs, top_k_indices = torch.topk(log_probs, k=S, dim=-1)
 
             # Initialize candidate tensors
-            V = log_probs.size(-1)  # vocab size
+            # V = log_probs.size(-1)  # vocab size
             candidate_seqs_BSL = sequences_BSL.unsqueeze(2).expand(-1, -1, S, -1).clone()
             candidate_scores_BSS = torch.full((B, S, S), float("-inf"), device=self.device)
 

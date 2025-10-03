@@ -209,6 +209,7 @@ def generate_routes(
     ckpt_dir: Path | None = None,
     commercial_stock: set[str] | None = None,
     use_fp16: bool = False,
+    show_progress: bool = True,
 ) -> list[str]:
     """Generate synthesis routes using the model.
 
@@ -245,6 +246,7 @@ def generate_routes(
         src_BC=encoder_inp.to(device),
         steps_B1=steps_tens.to(device) if steps_tens is not None else None,
         path_start_BL=path_tens.to(device),
+        progress_bar=show_progress,
     )
     for beam_result_S2 in beam_result_BS2:
         all_beam_results_NS2.append(beam_result_S2)
