@@ -1,5 +1,7 @@
+from collections.abc import Sequence
 from pathlib import Path
-from typing import Literal, cast, Sequence
+from typing import Literal, cast
+
 import torch
 import torch.nn as nn
 
