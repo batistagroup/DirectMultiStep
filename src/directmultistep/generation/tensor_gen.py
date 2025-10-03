@@ -167,17 +167,21 @@ class VectorizedBatchedBeamSearch:
             active_batch_idx, active_beam_idx = torch.where(active_mask_BS)
 
             # Vectorized candidate creation
+            # Track which beams should actually expand based on first_step logic
+            log_probs_idx = 0
             for i in range(active_count):
                 b = active_batch_idx[i]
                 s = active_beam_idx[i]
 
                 # At first step for this batch, only expand from first beam
                 if step == first_steps_B[b] and s > 0:
+                    log_probs_idx += 1
                     continue
 
                 # Update candidate sequences and scores
-                candidate_seqs_BSL[b, s, :, step] = top_k_indices[i]
-                candidate_scores_BSS[b, s, :] = scores_BS[b, s] + top_k_log_probs[i]
+                candidate_seqs_BSL[b, s, :, step] = top_k_indices[log_probs_idx]
+                candidate_scores_BSS[b, s, :] = scores_BS[b, s] + top_k_log_probs[log_probs_idx]
+                log_probs_idx += 1
 
             # Handle inactive beams (keep them as candidates with their scores)
             inactive_mask_BS = ~active_mask_BS & (scores_BS > float("-inf"))
