@@ -15,6 +15,12 @@ This work has been published in [*J. Chem. Inf. Model*](https://pubs.acs.org/doi
 
 You can use DMS models without installation through our web interface at [models.batistalab.com](https://models.batistalab.com). Or, if you want, you can install the package from pypi `pip install directmultistep`. Check out [dms.batistalab.com](https://dms.batistalab.com) for full documentation.
 
+## Benchmarking & Evaluation: RetroCast
+
+DirectMultiStep has been rigorously benchmarked as part of **[RetroCast](https://github.com/ischemist/project-procrustes)**, a unified framework for evaluating multistep retrosynthesis models. You can explore DirectMultiStep's predicted routes interactively on **[SynthArena](https://syntharena.ischemist.com/algorithms/directmultistep)**.
+
+RetroCast addresses key challenges in the field — incompatible output formats, ad-hoc metrics, and skewed benchmarks — by providing a canonical schema, curated benchmarks, and rigorous statistical comparison across 10+ models. See the [RetroCast preprint](https://arxiv.org/abs/2512.07079) for details.
+
 ## How to use
 
 Here's a quick example to generate a retrosynthesis route (you can get relevant checkpoints by running `bash download_files.sh`).
